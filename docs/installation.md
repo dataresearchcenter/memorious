@@ -1,11 +1,7 @@
----
-title: Installation
-layout: '@layouts/DocsLayout.astro'
----
-
 # Installation
 
-<p class="lead">This page explains how you can install Memorious to run your own crawlers.</p>
+!!! info "About this section"
+    This page explains how you can install Memorious to run your own crawlers.
 
 We recommend using [Docker Compose](https://docs.docker.com/compose/) to run your crawlers in production, and we have an [example project](https://github.com/alephdata/memorious/tree/master/example) to help you get started.
 

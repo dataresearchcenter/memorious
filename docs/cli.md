@@ -1,11 +1,7 @@
----
-title: CLI Reference
-layout: '@layouts/DocsLayout.astro'
----
-
 # CLI Reference
 
-<p class="lead">Memorious is controlled via a command-line tool, which can be used to monitor or invoke a crawler interactively.</p>
+!!! info "About this section"
+    Memorious is controlled via a command-line tool, which can be used to monitor or invoke a crawler interactively.
 
 See the status of all crawlers managed by memorious:
 

@@ -1,11 +1,7 @@
----
-title: Home
-layout: '@layouts/DocsLayout.astro'
----
-
 # Memorious
 
-<p class="lead">Memorious is a light-weight web scraping toolkit. It supports scrapers that collect structured or un-structured data.</p>
+!!! info "About"
+    Memorious is a light-weight web scraping toolkit. It supports scrapers that collect structured or un-structured data.
 
 * Make crawlers modular and simple tasks re-usable
 * Provide utility functions to do common tasks such as data storage, HTTP session management
@@ -13,7 +9,6 @@ layout: '@layouts/DocsLayout.astro'
 * Get out of your way as much as possible
 
 ## Design
-
 
 When writing a scraper, you often need to paginate through through an index page, then download an HTML page for each result and finally parse that page and insert or update a record in a database.
 
@@ -28,22 +23,11 @@ The basic steps of writing a Memorious crawler:
 
 ## Documentation
 
-<LinkCard
-  page="/installation"
-  text="Install Memorious and run your own crawlers."
-/>
+<div class="grid cards" markdown>
 
-<LinkCard
-  page="/cli"
-  text="Reference for the command-line tool to run and monitor crawlers."
-/>
+- [Install Memorious and run your own crawlers](./installation.md)
+- [Reference for the command-line tool to run and monitor crawlers](./cli.md)
+- [Build your own crawler using YAML configuration](./reference.md)
+- [Links to our Git repository and licensing information](./development.md)
 
-<LinkCard
-  page="/reference"
-  text="Build your own crawler using YAML configuration."
-/>
-
-<LinkCard
-  page="/development"
-  text="Links to our Git repository and licensing information."
-/>
+</div>

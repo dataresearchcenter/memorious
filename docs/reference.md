@@ -1,11 +1,7 @@
----
-title: 'Crawler Reference'
-layout: '@layouts/DocsLayout.astro'
----
-
 # Crawler Reference
 
-<p class="lead">This page explains how to configure a custom Memorious crawler and includes a reference for the available configuration options.</p>
+!!! info "About this section"
+    This page explains how to configure a custom Memorious crawler and includes a reference for the available configuration options.
 
 Memorious contains all of the functionality for basic Web crawlers, which can be configured and customized entirely through YAML files. For more complex crawlers, Memorious can be extended with custom Python functions, which you can point a crawler at through its YAML config.
 
