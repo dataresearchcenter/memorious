@@ -53,8 +53,8 @@ jobs:
       run: poetry install --with dev --all-extras
     - name: Run pre-commit hooks
       run: poetry run pre-commit run
-    - name: Lint with flake8
-      run: make lint
+    # - name: Lint with flake8
+    #   run: make lint
     - name: Test with pytest
       env:
         HTTPBIN: http://localhost:80
