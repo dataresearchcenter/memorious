@@ -1734,25 +1734,6 @@ dev = ["pytest", "tox"]
 lint = ["black"]
 
 [[package]]
-name = "pantomime"
-version = "0.6.1"
-description = "MIME type normalisation and labels."
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "pantomime-0.6.1-py2.py3-none-any.whl", hash = "sha256:4ea567dffc2458a174cd624061a1a0efc081c858938d55291e4825e47a4fdb0f"},
-    {file = "pantomime-0.6.1.tar.gz", hash = "sha256:6ff211788ecfbe2cdf79bf8617d7e2347b9d734ce3dac983cafa9673ed099789"},
-]
-
-[package.dependencies]
-banal = ">=0.3.5"
-normality = ">=0.5.6"
-
-[package.extras]
-dev = ["banal", "black", "coverage (>=4.1)", "flake8 (>=2.6.0)", "mypy", "pytest", "pytest-cov", "twine", "wheel (>=0.29.0)"]
-
-[[package]]
 name = "parso"
 version = "0.8.4"
 description = "A Python Parser"
@@ -3246,4 +3227,4 @@ sql = ["sqlalchemy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4"
-content-hash = "16b0786a0ce901bef70b6d450d0e4dc490ca4c03f2fa3671e0942cad6c6cc455"
+content-hash = "a00d862cf4efe8b240ddd267e01df303b14489898eb342ae2d11407e1d621991"

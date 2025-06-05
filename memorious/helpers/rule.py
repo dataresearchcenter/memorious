@@ -1,7 +1,8 @@
 import re
 from urllib.parse import urlparse
-from pantomime import normalize_mimetype
+
 from lxml import html
+from rigour.mime import normalize_mimetype
 
 from memorious.logic.mime import GROUPS
 

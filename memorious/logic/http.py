@@ -1,26 +1,27 @@
 import cgi
+import codecs
 import json
 import pickle
-import codecs
+from datetime import datetime, timedelta
 from hashlib import sha1
 from pathlib import Path
-from lxml import html, etree
-from datetime import datetime, timedelta
 from urllib.parse import unquote, urlparse
+
 from banal import hash_data, is_mapping
-from pantomime import parse_mimetype, normalize_mimetype
+from lxml import etree, html
 from normality import guess_file_encoding, stringify
-from requests import Session, Request
+from requests import Request, Session
 from requests.structures import CaseInsensitiveDict
+from rigour.mime import normalize_mimetype, parse_mimetype
 from servicelayer.cache import make_key
 from servicelayer.settings import REDIS_SHORT
 
 from memorious import settings
-from memorious.core import conn, storage, get_rate_limit
-from memorious.logic.mime import NON_HTML
+from memorious.core import conn, get_rate_limit, storage
 from memorious.exc import ParseError
-from memorious.helpers.ua import UserAgent
 from memorious.helpers.dates import parse_date
+from memorious.helpers.ua import UserAgent
+from memorious.logic.mime import NON_HTML
 from memorious.util import random_filename
 
 
@@ -49,7 +50,7 @@ class ContextHttp(object):
         self,
         method,
         url,
-        headers={},
+        headers=None,
         auth=None,
         data=None,
         params=None,
@@ -58,6 +59,7 @@ class ContextHttp(object):
         timeout=settings.HTTP_TIMEOUT,
         lazy=False,
     ):
+        headers = headers or {}
         if is_mapping(params):
             params = list(params.items())
 
