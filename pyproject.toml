@@ -1,6 +1,6 @@
 [project]
 name = "memorious"
-version = "2.6.4"
+version = "3.0.0"
 description = "A minimalistic, recursive web crawling library for Python."
 authors = [
     { name = "Organized Crime and Corruption Reporting Project", email = "data@occrp.org" },
