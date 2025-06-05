@@ -16,7 +16,7 @@ pipeline:
     # Download the page passed from the login stage.
     method: fetch
     handle:
-      pass: crawl 
+      pass: crawl
   crawl:
     # Crawl the HTML of the page passed in to extract specific things.
     method: example.quotes:crawl

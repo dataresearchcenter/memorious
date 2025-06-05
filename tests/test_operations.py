@@ -1,14 +1,15 @@
-import os
 import json
+import os
 import shutil
-import pytest
 from unittest.mock import ANY
 
-from memorious.core import tags, storage
+import pytest
+
+from memorious.core import storage, tags
 from memorious.operations.fetch import fetch, session
+from memorious.operations.initializers import dates, enumerate, seed, sequence
 from memorious.operations.parse import parse
-from memorious.operations.initializers import seed, sequence, dates, enumerate
-from memorious.operations.store import directory, cleanup_archive
+from memorious.operations.store import cleanup_archive, directory
 
 HTTPBIN = os.environ.get("HTTPBIN", "https://proxy:443")
 

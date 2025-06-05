@@ -1,6 +1,8 @@
 from collections import namedtuple
+
 import pytest
-from memorious.helpers.rule import RULES, Rule, DomainRule, UrlPatternRule, XpathRule
+
+from memorious.helpers.rule import RULES, DomainRule, Rule, UrlPatternRule, XpathRule
 
 spec = {
     "and": [
@@ -17,7 +19,7 @@ spec = {
                     {"pattern": "https://www.occrp.org/en/donate.*"},
                     {"pattern": "https://www.occrp.org/.*start=.*"},
                     {"pattern": "https://www.occrp.org/ru/.*"},
-                    {"xpath": "//div[@title=\"buyer-name\"]/text()"}
+                    {"xpath": '//div[@title="buyer-name"]/text()'},
                 ]
             }
         },
@@ -63,8 +65,8 @@ class TestUrlPatternRule(object):
 
 class TestXpathRule(object):
     def test_xpath(self):
-        rule = XpathRule("//div[@class=\"section-title\"]/text()")
-        rule.configure();
+        rule = XpathRule('//div[@class="section-title"]/text()')
+        rule.configure()
         Response = namedtuple("Response", "text")
-        res = Response(text="<div class=\"section-title\">text</div>")
+        res = Response(text='<div class="section-title">text</div>')
         assert rule.apply(res)

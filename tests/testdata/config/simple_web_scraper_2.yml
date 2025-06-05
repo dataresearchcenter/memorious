@@ -8,7 +8,7 @@ pipeline:
     # Start URL
     method: seed
     params:
-      urls: 
+      urls:
         - http://books.toscrape.com
     handle:
       pass: fetch
@@ -16,7 +16,7 @@ pipeline:
     # Download the page passed from the seed stage.
     method: fetch
     handle:
-      pass: parse 
+      pass: parse
   parse:
     # Crawl the HTML of the page passed in to extract specific things.
     method: parse

@@ -55,7 +55,7 @@ pipeline:
       store: store
       # this makes it a recursive web crawler:
       fetch: fetch
-  
+
   store:
     # Store the crawled documents to a directory
     method: directory

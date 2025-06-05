@@ -1,7 +1,8 @@
 import os
+
 import pytest
-from requests import Session, Response, Request
-from lxml import html, etree
+from lxml import etree, html
+from requests import Request, Response, Session
 
 from memorious.logic.http import ContextHttpResponse
 

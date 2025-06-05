@@ -1,6 +1,9 @@
 DOCKER=docker run -v $(PWD)/dist:/memorious/dist -ti ghcr.io/dataresearchcenter/memorious
 COMPOSE=docker compose -f docker-compose.dev.yml
 
+HTTPBIN := http://localhost:80
+
+
 .PHONY: all clean build dev rebuild test services shell image
 
 all: clean
@@ -25,7 +28,7 @@ rebuild:
 test:
 	# Check if the command works
 	memorious list
-	pytest --cov=memorious --cov-report term-missing
+	pytest tests --cov=memorious --cov-report term-missing
 
 services:
 	$(COMPOSE) up -d httpbin proxy

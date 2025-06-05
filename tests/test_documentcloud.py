@@ -1,4 +1,5 @@
 import pytest  # noqa
+
 from memorious.operations.documentcloud import documentcloud_query
 
 

@@ -4,10 +4,9 @@ import uuid
 import pytest
 
 from memorious import settings
-from memorious.logic.manager import CrawlerManager
 from memorious.logic.context import Context
 from memorious.logic.http import ContextHttp
-
+from memorious.logic.manager import CrawlerManager
 
 settings.TESTING = True
 
