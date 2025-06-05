@@ -26,8 +26,6 @@ rebuild:
 	docker build --pull --no-cache -t ghcr.io/dataresearchcenter/memorious .
 
 test:
-	# Check if the command works
-	memorious list
 	pytest tests --cov=memorious --cov-report lcov
 
 services:
