@@ -54,7 +54,7 @@ jobs:
     - name: Run pre-commit hooks
       run: poetry run pre-commit run
     - name: Update setuptools
-      run: pip install -U pip setuptools
+      run: poetry run pip install -U pip setuptools
     # - name: Lint with flake8
     #   run: make lint
     - name: Test with pytest
