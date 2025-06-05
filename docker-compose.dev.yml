@@ -2,7 +2,7 @@ version: "2"
 
 services:
   datastore:
-    image: postgres:11.4
+    image: postgres:17
     volumes:
       - "./build/datastore:/var/lib/postgresql/data"
     environment:
@@ -14,14 +14,6 @@ services:
     command: [ "redis-server", "--appendonly", "yes" ]
     volumes:
       - ./build/redis-data:/data
-
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    restart: always
-    environment:
-      REDIS_HOSTS: local:redis:6379
-    ports:
-      - "0.0.0.0:8081:8081"
 
   shell:
     build: .
@@ -42,7 +34,7 @@ services:
       ARCHIVE_PATH: /data/archive
       REDIS_URL: redis://redis:6379/0
       MEMORIOUS_DATASTORE_URI: postgresql://datastore:datastore@datastore/datastore
-      WORKER_THREADS: 20
+      WORKER_THREADS: 2
     ports:
       - "0.0.0.0:5678:5678"
 

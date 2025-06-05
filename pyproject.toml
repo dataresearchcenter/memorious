@@ -1,0 +1,113 @@
+[project]
+name = "memorious"
+version = "2.6.4"
+description = "A minimalistic, recursive web crawling library for Python."
+authors = [
+    { name = "Organized Crime and Corruption Reporting Project", email = "data@occrp.org" },
+    { name = "Data and Research Center", email = "hi@dataresearchcenter.org" },
+]
+license = "MIT"
+readme = "README.rst"
+classifiers = [
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.11,<4"
+dependencies = [
+    "banal >= 1.0.6, < 2.0.0",
+    "click",
+    "requests[security] >= 2.21.0",
+    "PySocks == 1.7.1",
+    "requests_ftp",
+    "lxml >= 4",
+    "normality >= 2.4.0, < 3.0.0",
+    "tabulate",
+    "python-dateutil >= 2.8.2, < 3.0.0",
+    "dataset >= 1.6.2",
+    "servicelayer[google,amazon] >= 1.21.2",
+    "pantomime == 0.5.1",
+    "alephclient >= 2.3.5",
+    "followthemoney >= 3.5.8",
+    "followthemoney-store >= 3.0.6",
+    "dateparser",
+    "stringcase",
+    "flask",
+    "babel",
+    "legacy-cgi (>=2.6.3,<3.0.0)",
+]
+
+[project.optional-dependencies]
+ocr = ["tesserocr (>=2.8.0,<3.0.0)"]
+# level = ["plyvel (>=1.5.1,<2.0.0)"]
+# sql = ["sqlalchemy (>=2.0.36,<3.0.0)"]
+# postgres = ["sqlalchemy (>=2.0.36,<3.0.0)", "psycopg2 (>=2.9.10,<3.0.0)"]
+# redis = ["redis (>=5.2.1,<6.0.0)", "fakeredis (>=2.26.2,<3.0.0)"]
+
+[project.scripts]
+memorious = "memorious.cli:main"
+
+[project.entry-points."memorious.operations"]
+memorious = "memorious.cli:main"
+fetch = "memorious.operations.fetch:fetch"
+session = "memorious.operations.fetch:session"
+dav_index = "memorious.operations.webdav:dav_index"
+parse = "memorious.operations.parse:parse"
+clean_html = "memorious.operations.clean:clean_html"
+seed = "memorious.operations.initializers:seed"
+tee = "memorious.operations.initializers:tee"
+sequence = "memorious.operations.initializers:sequence"
+dates = "memorious.operations.initializers:dates"
+enumerate = "memorious.operations.initializers:enumerate"
+inspect = "memorious.operations.debug:inspect"
+documentcloud_query = "memorious.operations.documentcloud:documentcloud_query"  # noqa
+documentcloud_mark_processed = "memorious.operations.documentcloud:documentcloud_mark_processed"  # noqa
+directory = "memorious.operations.store:directory"
+cleanup_archive = "memorious.operations.store:cleanup_archive"
+extract = "memorious.operations.extract:extract"
+db = "memorious.operations.db:db"
+ftp_fetch = "memorious.operations.ftp:ftp_fetch"
+aleph_emit = "memorious.operations.aleph:aleph_emit"
+aleph_emit_document = "memorious.operations.aleph:aleph_emit_document"
+aleph_folder = "memorious.operations.aleph:aleph_folder"
+aleph_emit_entity = "memorious.operations.aleph:aleph_emit_entity"
+balkhash_put = "memorious.operations.ftm:ftm_store"
+ftm_store = "memorious.operations.ftm:ftm_store"
+ftm_load_aleph = "memorious.operations.ftm:ftm_load_aleph"
+
+[project.urls]
+Homepage = "https://docs.investigraph.dev/lib/memorious"
+Documentation = "https://docs.investigraph.dev/lib/memorious"
+Repository = "https://github.com/dataresearchcenter/memorious"
+Issues = "https://github.com/dataresearchcenter/memorious/issues"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.4.3,<9.0.0"
+pytest-cov = ">=4.1,<7.0"
+pytest-env = "^1.1.1"
+black = ">=23.11,<25.0"
+isort = "^5.12.0"
+mypy = "^1.7.0"
+pre-commit = "^4.0.1"
+flake8 = ">=6.1,<8.0"
+ipdb = "^0.13.13"
+bump2version = "^1.0.1"
+mkdocs = "^1.6.1"
+mkdocstrings-python = "^1.16.10"
+mkdocs-autorefs = "^1.4.1"
+mkdocs-material = "^9.6.13"
+mkdocs-click = "^0.9.0"
+pytest-mock = "^3.14.1"
+sphinx = "^8.2.3"
+sphinx-rtd-theme = "^3.0.2"
+recommonmark = "^0.7.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest_env]
+DEBUG = 1
