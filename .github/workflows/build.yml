@@ -55,18 +55,18 @@ jobs:
           echo "$GITHUB_REF"
       - name: Build docker image
         run: |
-          docker build -t ghcr.io/alephdata/memorious:${GITHUB_SHA} .
+          docker build -t ghcr.io/dataresearchcenter/memorious:${GITHUB_SHA} .
       - name: Push docker image for hash
         env:
           GITHUB_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         if: env.GITHUB_PASSWORD != null
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
-          docker push ghcr.io/alephdata/memorious:${GITHUB_SHA}
+          docker push ghcr.io/dataresearchcenter/memorious:${GITHUB_SHA}
       - name: Push docker image for tags
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
         run: |
-          docker tag ghcr.io/alephdata/memorious:${GITHUB_SHA} ghcr.io/alephdata/memorious:${GITHUB_REF/refs\/tags\//}
-          docker push ghcr.io/alephdata/memorious:${GITHUB_REF/refs\/tags\//}
-          docker tag ghcr.io/alephdata/memorious:${GITHUB_SHA} ghcr.io/alephdata/memorious:latest
-          docker push ghcr.io/alephdata/memorious:latest
+          docker tag ghcr.io/dataresearchcenter/memorious:${GITHUB_SHA} ghcr.io/dataresearchcenter/memorious:${GITHUB_REF/refs\/tags\//}
+          docker push ghcr.io/dataresearchcenter/memorious:${GITHUB_REF/refs\/tags\//}
+          docker tag ghcr.io/dataresearchcenter/memorious:${GITHUB_SHA} ghcr.io/dataresearchcenter/memorious:latest
+          docker push ghcr.io/dataresearchcenter/memorious:latest
