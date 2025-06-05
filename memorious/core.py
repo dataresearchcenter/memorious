@@ -1,13 +1,12 @@
 import logging
 import os
-import dataset
+
 from servicelayer.archive import init_archive
-from servicelayer.rate_limit import RateLimit
-from servicelayer.cache import get_redis, get_fakeredis
+from servicelayer.cache import get_fakeredis, get_redis
 from servicelayer.extensions import get_extensions
-from servicelayer.tags import Tags
 from servicelayer.logs import configure_logging
-from sqlalchemy.pool import NullPool
+from servicelayer.rate_limit import RateLimit
+from servicelayer.tags import Tags
 from werkzeug.local import LocalProxy
 
 from memorious import settings
@@ -25,18 +24,6 @@ def load_manager():
     return settings._manager
 
 
-def load_datastore():
-    if not hasattr(settings, "_datastore"):
-        # do not pool connections for the datastore
-        engine_kwargs = {"poolclass": NullPool}
-        settings._datastore = dataset.connect(
-            settings.DATASTORE_URI, engine_kwargs=engine_kwargs
-        )
-        # Use bigint to store integers by default
-        settings._datastore.types.integer = settings._datastore.types.bigint
-    return settings._datastore
-
-
 def load_tags():
     if not hasattr(settings, "_tags"):
         settings._tags = Tags(settings.TAGS_TABLE, uri=settings.DATASTORE_URI)
@@ -45,7 +32,7 @@ def load_tags():
 
 def get_crawler():
     if not hasattr(settings, "_crawler"):
-        return RuntimeError("No current crawler. Quiting.")
+        return RuntimeError("No current crawler. Quitting.")
     return settings._crawler
 
 
@@ -56,7 +43,6 @@ def connect_redis():
 
 
 manager = LocalProxy(load_manager)
-datastore = LocalProxy(load_datastore)
 tags = LocalProxy(load_tags)
 conn = LocalProxy(connect_redis)
 crawler = LocalProxy(get_crawler)

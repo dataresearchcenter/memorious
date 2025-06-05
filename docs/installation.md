@@ -46,11 +46,10 @@ Your Memorious instance is configured by a set of environment variables that con
 - `MEMORIOUS_DEBUG`: whether to go into a simple mode with task threading disabled. Defaults to `False`.
 - `MEMORIOUS_INCREMENTAL`: executing part of a crawler only once per an interval. Defaults to `True`.
 - `MEMORIOUS_EXPIRE`: how many days until cached crawled data expires. Defaults to 1 day.
-- `MEMORIOUS_DB_RATE_LIMIT`: maximum number of database inserts per minute. Defaults to 6000.
 - `MEMORIOUS_HTTP_RATE_LIMIT`: maximum number of http calls to a host per minute. Defaults to 120.
 - `MEMORIOUS_HTTP_CACHE`: HTTP request configuration.
 - `MEMORIOUS_USER_AGENT`: Custom User-Agent string for Memorious.
-- `MEMORIOUS_DATASTORE_URI`: connection path for an operational database (which crawlers can send data to using the `db` method). Defaults to a local `datastore.sqllite3`.
+- `MEMORIOUS_DATASTORE_URI`: connection path for an operational database for `servicelayer` tags. Defaults to a local `datastore.sqllite3`.
 
 - `REDIS_URL`: address of Redis instance to use for crawler logs (uses a temporary FakeRedis if missing).
 - `ARCHIVE_TYPE`: either `file`(local file system is used for storage) or `s3`(Amazon S3 is used) or `gs`(Google Cloud Storage is used).

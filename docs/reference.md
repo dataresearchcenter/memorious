@@ -308,19 +308,6 @@ Output:
 - The file is stored in `path`.
 - The `data` dict is dumped as a JSON file in `path` too.
 
-#### Database
-
-The `db` method stores `data` as a row in a specified database table with appropriate timestamps. `__last_seen` and `__first_seen` timestamps are added based on when a row was updated or inserted respectively.
-
-Parameters:
-
-- `table`: the name of the database table in which data will be stored
-- `unique`: A list of keys in data. If `unique` is defined, we try to update existing columns based on the values of keys in `unique`. If no matching row is found, a new row is inserted.
-
-<Callout>
-  In case of large crawlers, it's better to use [the context datastore](#the-datastore) directly to store crawled data to make sure the task queue doesn't run out of memory.
-</Callout>
-
 #### Storing documents in Aleph
 
 The [alephclient](https://github.com/alephdata/alephclient) package provides a method named `aleph_emit_document` to push crawled documents from a Memorious crawler into an
@@ -456,11 +443,6 @@ As part of the context logic the following data validation helpers are available
 - `match_regexp`: whether value matches a regexp.
 - `has_length`: whether value has a given length.
 - `must_contain`: whether value contains a string.
-
-#### The datastore
-
-- Create and access tables in the Memorious database to store intermediary useful crawler data: `table = context.datastore['my_table']`.
-- See [dataset](https://dataset.readthedocs.io/en/latest/) for the rest of how this works..
 
 #### Output
 

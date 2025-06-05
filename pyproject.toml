@@ -27,7 +27,6 @@ dependencies = [
     "normality >= 2.4.0, < 3.0.0",
     "tabulate",
     "python-dateutil >= 2.8.2, < 3.0.0",
-    "dataset >= 1.6.2",
     "servicelayer[google,amazon] >= 1.21.2",
     "pantomime == 0.5.1",
     "alephclient >= 2.3.5",
@@ -67,7 +66,6 @@ documentcloud_mark_processed = "memorious.operations.documentcloud:documentcloud
 directory = "memorious.operations.store:directory"
 cleanup_archive = "memorious.operations.store:cleanup_archive"
 extract = "memorious.operations.extract:extract"
-db = "memorious.operations.db:db"
 ftp_fetch = "memorious.operations.ftp:ftp_fetch"
 aleph_emit = "memorious.operations.aleph:aleph_emit"
 aleph_emit_document = "memorious.operations.aleph:aleph_emit_document"

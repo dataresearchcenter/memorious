@@ -1,22 +1,23 @@
-import os
-import uuid
-import shutil
 import logging
-import time
+import os
 import random
+import shutil
+import time
+import uuid
+from contextlib import contextmanager
 from copy import deepcopy
 from tempfile import mkdtemp
-from contextlib import contextmanager
-from servicelayer.cache import make_key
-from servicelayer.util import load_json, dump_json
 
-from memorious.core import manager, storage, tags, datastore
-from memorious.model import Queue, Crawl
-from memorious.logic.http import ContextHttp
-from memorious.logic.check import ContextCheck
-from memorious.util import random_filename
-from memorious.exc import QueueTooBigError
+from servicelayer.cache import make_key
+from servicelayer.util import dump_json, load_json
+
 from memorious import settings
+from memorious.core import manager, storage, tags
+from memorious.exc import QueueTooBigError
+from memorious.logic.check import ContextCheck
+from memorious.logic.http import ContextHttp
+from memorious.model import Crawl, Queue
+from memorious.util import random_filename
 
 
 class Context(object):
@@ -33,7 +34,6 @@ class Context(object):
         self.work_path = mkdtemp()
         self.log = logging.getLogger("%s.%s" % (crawler.name, stage.name))
         self.http = ContextHttp(self)
-        self.datastore = datastore
         self.check = ContextCheck(self)
 
     def get(self, name, default=None):
@@ -43,9 +43,10 @@ class Context(object):
             value = os.path.expandvars(value)
         return value
 
-    def emit(self, rule="pass", stage=None, data={}, delay=None, optional=False):
+    def emit(self, rule="pass", stage=None, data=None, delay=None, optional=False):
         """Invoke the next stage, either based on a handling rule, or by
         calling the `pass` rule by default."""
+        data = data or {}
         if stage is None:
             stage = self.stage.handlers.get(rule)
         if optional and stage is None:
@@ -102,7 +103,7 @@ class Context(object):
             shutil.rmtree(self.work_path)
 
     def sleep(self, seconds):
-        for sec in range(seconds):
+        for _ in range(seconds):
             time.sleep(1)
 
     def emit_warning(self, message, *args):

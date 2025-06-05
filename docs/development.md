@@ -9,6 +9,7 @@ Get the code here: [https://github.com/dataresearchcenter/memorious](https://git
 
 ## Changelog since v2.6.4
 - 🔥 Remove ocr feature
+- 🔥 Remove dataset (db operations)
 
 ## Licensing
 
