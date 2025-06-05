@@ -28,7 +28,7 @@ rebuild:
 test:
 	# Check if the command works
 	memorious list
-	pytest tests --cov=memorious --cov-report term-missing
+	pytest tests --cov=memorious --cov-report lcov
 
 services:
 	$(COMPOSE) up -d httpbin proxy
