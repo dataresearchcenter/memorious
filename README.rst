@@ -12,7 +12,7 @@ Memorious
 ``memorious`` is a light-weight web scraping toolkit. It supports scrapers that
 collect structured or un-structured data. This includes the following use cases:
 
-* Make crawlers modular and simple tasks re-usable
+* Make crawlers modular and simple tasks reusable
 * Provide utility functions to do common tasks such as data storage, HTTP session management
 * Integrate crawlers with the Aleph and FollowTheMoney ecosystem
 * Get out of your way as much as possible
@@ -24,9 +24,9 @@ When writing a scraper, you often need to paginate through through an index
 page, then download an HTML page for each result and finally parse that page
 and insert or update a record in a database.
 
-``memorious`` handles this by managing a set of ``crawlers``, each of which 
+``memorious`` handles this by managing a set of ``crawlers``, each of which
 can be composed of multiple ``stages``. Each ``stage`` is implemented using a
-Python function, which can be re-used across different ``crawlers``.
+Python function, which can be reused across different ``crawlers``.
 
 The basic steps of writing a Memorious crawler:
 
@@ -39,9 +39,7 @@ Documentation
 -------------
 
 The documentation for Memorious is available at
-`alephdata.github.io/memorious <https://alephdata.github.io/memorious/>`_.
+`docs.investigraph.dev/lib/memorious <https://docs.investigraph.dev/lib/memorious>`_.
 Feel free to edit the source files in the ``docs`` folder and send pull requests for improvements.
 
-To build the documentation, inside the ``docs`` folder run ``make html``
-
-You'll find the resulting HTML files in /docs/_build/html.
+To serve the documentation locally, run ``mkdocs serve``
