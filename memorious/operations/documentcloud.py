@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from urllib.parse import urljoin
 
@@ -71,9 +70,10 @@ def documentcloud_query(context, data):
             "mime_type": "application/pdf",
         }
 
-        # In incremental crawling mode, skip processing this document if it has been already fully processed before.
-        # The key we check for is set in `mark_processed` after a document is fully processed.
-        # So the supplied arguments to `make_key` must match.
+        # In incremental crawling mode, skip processing this document if it has
+        # been already fully processed before.  The key we check for is set in
+        # `mark_processed` after a document is fully processed.  So the supplied
+        # arguments to `make_key` must match.
         if context.incremental:
             key = make_key(
                 context.crawler.name,

@@ -42,9 +42,9 @@ DOCUMENTS = [
     "application/x-rtf",
     "application/vnd.oasis.opendocument.graphics",
     "application/vnd.oasis.opendocument.presentation",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",  # noqa
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  # noqa
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",  # noqa
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ]
 
 ARCHIVES = [

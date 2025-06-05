@@ -1,11 +1,10 @@
 import structlog
-
-from servicelayer.worker import Worker
 from servicelayer.logs import apply_task_context
+from servicelayer.worker import Worker
 
+from memorious.core import conn, crawler
 from memorious.logic.context import Context
 from memorious.logic.stage import CrawlerStage
-from memorious.core import conn, crawler
 
 log = structlog.get_logger(__name__)
 

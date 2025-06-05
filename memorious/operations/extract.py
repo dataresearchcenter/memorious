@@ -2,9 +2,9 @@ import os
 import subprocess
 import tarfile
 import zipfile
+from fnmatch import fnmatch
 
 from banal import ensure_list
-from fnmatch import fnmatch
 
 from memorious.util import random_filename
 
@@ -43,7 +43,7 @@ def extract_tar(file_path, extract_dir, context):
     with tarfile.open(file_path, "r:*") as tar_ref:
         for name in tar_ref.getnames():
             # Make it safe. See warning at
-            # https://docs.python.org/2/library/tarfile.html#tarfile.TarFile.extractall  # noqa
+            # https://docs.python.org/2/library/tarfile.html#tarfile.TarFile.extractall
             if name.startswith("..") or name.startswith("/"):
                 context.log.info(
                     "Bad path %s while extracting archive at %s", name, file_path
@@ -60,7 +60,7 @@ def extract_7zip(file_path, extract_dir, context):
     if return_code != 0:
         context.log.warning("Couldn't extract file: %s", file_path)
         return
-    for root, directories, filenames in os.walk(extract_dir):
+    for root, _, filenames in os.walk(extract_dir):
         for filename in filenames:
             file_path = os.path.join(root, filename)
             yield file_path

@@ -1,12 +1,12 @@
 import logging
 import math
 
-from servicelayer.jobs import Job
 from servicelayer.cache import make_key
+from servicelayer.jobs import Job
 
 from memorious.core import conn
-from memorious.settings import MAX_QUEUE_LENGTH
 from memorious.exc import QueueTooBigError
+from memorious.settings import MAX_QUEUE_LENGTH
 
 log = logging.getLogger(__name__)
 

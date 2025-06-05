@@ -1,4 +1,5 @@
 from urllib.parse import urlparse
+
 from requests.exceptions import RequestException
 from servicelayer.cache import make_key
 
@@ -37,7 +38,7 @@ def fetch(context, data):
         if retries >= attempt:
             context.log.warn("Retry: %s (error: %s)", url, ce)
             data["retry_attempt"] = attempt + 1
-            context.recurse(data=data, delay=2 ** attempt)
+            context.recurse(data=data, delay=2**attempt)
         else:
             context.emit_warning("Fetch fail [%s]: %s" % (url, ce))
 

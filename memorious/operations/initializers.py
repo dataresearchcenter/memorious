@@ -1,5 +1,6 @@
-from banal import ensure_list
 from datetime import datetime, timedelta
+
+from banal import ensure_list
 
 
 def seed(context, data):

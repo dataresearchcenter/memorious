@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 from fnmatch import fnmatch
 
 from memorious.logic.crawler import Crawler
@@ -19,17 +19,13 @@ class CrawlerManager(object):
 
         for root, _, file_names in os.walk(path):
             for file_name in file_names:
-                if not (
-                    fnmatch(file_name, "*.yaml") or fnmatch(file_name, "*.yml")
-                ):  # noqa
+                if not (fnmatch(file_name, "*.yaml") or fnmatch(file_name, "*.yml")):
                     continue
                 source_file = os.path.join(root, file_name)
                 try:
                     crawler = Crawler(self, source_file)
                 except ValueError:
-                    log.exception(
-                        "Skipping %s due to the following error", file_name
-                    )  # noqa
+                    log.exception("Skipping %s due to the following error", file_name)
                     continue
                 self.crawlers[crawler.name] = crawler
 

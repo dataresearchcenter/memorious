@@ -1,5 +1,5 @@
 from pathlib import Path
-from urllib.parse import urljoin, urlparse, unquote
+from urllib.parse import unquote, urljoin, urlparse
 
 
 def _get_url_file_name(url):

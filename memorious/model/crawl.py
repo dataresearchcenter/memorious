@@ -1,11 +1,11 @@
 import logging
-from banal import ensure_list
 from datetime import datetime
 
-from servicelayer.jobs import Job
-from servicelayer.util import unpack_int, unpack_datetime, pack_now
+from banal import ensure_list
 from servicelayer.cache import make_key
+from servicelayer.jobs import Job
 from servicelayer.settings import REDIS_LONG
+from servicelayer.util import pack_now, unpack_datetime, unpack_int
 
 from memorious.core import conn
 
@@ -58,7 +58,7 @@ class Crawl(object):
             conn.expire(make_key(crawler, "runs"), REDIS_LONG)
             conn.set(
                 make_key(crawler, "run", run_id, "start"), pack_now(), ex=REDIS_LONG
-            )  # noqa
+            )
         conn.incr(make_key(crawler, "run", run_id))
         conn.incr(make_key(crawler, "run", run_id, "total_ops"))
         conn.incr(make_key(crawler, stage))

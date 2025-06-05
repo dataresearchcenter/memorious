@@ -1,5 +1,6 @@
 import re
 from importlib import import_module
+
 from servicelayer.extensions import get_entry_point
 
 from memorious.model import Crawl

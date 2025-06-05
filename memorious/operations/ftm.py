@@ -2,8 +2,8 @@ from banal import ensure_list
 from ftmstore import get_dataset as get_ftmstore_dataset
 from ftmstore.settings import DATABASE_URI, DEFAULT_DATABASE_URI
 
-from memorious.settings import DATASTORE_URI
 from memorious.operations.aleph import get_api
+from memorious.settings import DATASTORE_URI
 
 ORIGIN = "memorious"
 

@@ -1,14 +1,13 @@
 from pathlib import Path
-from pprint import pprint  # noqa
 
 from alephclient import settings
 from alephclient.api import AlephAPI
 from alephclient.errors import AlephException
 from alephclient.util import backoff
-from banal import clean_dict, ensure_dict, ensure_list  # type: ignore
-from servicelayer.cache import make_key  # type: ignore
+from banal import clean_dict, ensure_dict, ensure_list
+from servicelayer.cache import make_key
 
-from memorious.core import get_rate_limit  # type: ignore
+from memorious.core import get_rate_limit
 
 
 def _create_document_metadata(context, data) -> dict:
@@ -143,7 +142,7 @@ def aleph_emit_entity(context, data):
     collection_id = get_collection_id(context, api)
     entity_id = data.get("entity_id", data.get("id"))
     if not entity_id:
-        context.emit_warning("Error: Can not create entity. `id` is not definied")
+        context.emit_warning("Error: Can not create entity. `id` is not defined")
         return
     source_url = data.get("source_url", data.get("url"))
     foreign_id = data.get("foreign_id", data.get("request_id", source_url))

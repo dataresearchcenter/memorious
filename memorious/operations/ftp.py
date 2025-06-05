@@ -5,9 +5,8 @@ from urllib.parse import urlparse
 import requests
 import requests_ftp
 
-from memorious.core import get_rate_limit
-from memorious.model import Queue
 from memorious import settings
+from memorious.core import get_rate_limit
 
 
 def ftp_fetch(context, data):

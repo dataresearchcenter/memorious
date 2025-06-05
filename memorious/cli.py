@@ -1,13 +1,14 @@
-import click
 import logging
 import sys
 from pathlib import Path
+
+import click
 from tabulate import tabulate
 
 from memorious import settings
-from memorious.core import manager, init_memorious, conn
-from memorious.worker import get_worker
+from memorious.core import conn, init_memorious, manager
 from memorious.logic.manager import CrawlerManager
+from memorious.worker import get_worker
 
 log = logging.getLogger(__name__)
 

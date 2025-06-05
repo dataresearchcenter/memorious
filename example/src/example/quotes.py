@@ -1,4 +1,5 @@
 from urllib.parse import urljoin
+
 import datafreeze
 
 
@@ -54,7 +55,7 @@ def crawl(context, data):
             "author": quote.find('.//small[@class="author"]').text_content(),
             "tags": ", ".join(
                 [tag.text_content() for tag in quote.findall('.//a[@class="tag"]')]
-            ),  # noqa
+            ),
         }
 
         # If 'rule' is not set, it defaults to 'pass', which triggers the

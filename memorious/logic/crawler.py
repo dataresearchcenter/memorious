@@ -1,18 +1,19 @@
-import os
 import io
-import yaml
 import logging
+import os
 import re
 from datetime import timedelta
 from importlib import import_module
+
+import yaml
 from servicelayer.cache import make_key
-from servicelayer.jobs import Dataset, Job
 from servicelayer.extensions import get_entry_point
+from servicelayer.jobs import Dataset, Job
 
 from memorious import settings
 from memorious.core import conn, tags
-from memorious.model import Crawl, Queue
 from memorious.logic.stage import CrawlerStage
+from memorious.model import Crawl, Queue
 
 log = logging.getLogger(__name__)
 

@@ -47,13 +47,13 @@ repos:
       - id: pyproject-flake8
         additional_dependencies: [ flake8-bugbear ]
         args: [ "--extend-ignore", "E203, E501, W503" ]
-        exclude: (test_[\w]+\.py|\.csv|\.json|\.lock)$
+        exclude: (ua\.py|test_[\w]+\.py|\.csv|\.json|\.lock)$
 
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
       - id: codespell
-        exclude: (test_[\w]+\.py|\.csv|\.i?json|\.lock)$
+        exclude: (ua\.py|test_[\w]+\.py|\.csv|\.i?json|\.lock)$
 
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0

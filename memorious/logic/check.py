@@ -1,7 +1,8 @@
 import numbers
 import re
-from normality import stringify
+
 from dateutil.parser import parse
+from normality import stringify
 
 
 class ContextCheck(object):
