@@ -354,11 +354,11 @@ The `data` `alpeh_emit_document` emits to the next stages includes the following
 
 #### Storing entities in Aleph
 
-In addtion to storing documents the [alephclient](https://github.com/alephdata/alephclient) package also provides a method called `aleph_emit_entity` which will take content extracted via a memorious crawler directly into a [followthemoney](https://github.com/alephdata/followthemoney) entity within Aleph.
+In addition to storing documents the [alephclient](https://github.com/alephdata/alephclient) package also provides a method called `aleph_emit_entity` which will take content extracted via a memorious crawler directly into a [followthemoney](https://github.com/alephdata/followthemoney) entity within Aleph.
 
 In order to create entities you will need to map data from the document(s) being crawled and parse it into the appropriate properties for the entity that you are creating.
 
-We can map parts of a crawled page to a [followthemoney](https://github.com/alephdata/followthemoney) entity by supplying an appropriate schema and mathching properties as part of the parse section of our scraper:
+We can map parts of a crawled page to a [followthemoney](https://github.com/alephdata/followthemoney) entity by supplying an appropriate schema and matching properties as part of the parse section of our scraper:
 
 ```yaml
 parse:
@@ -505,18 +505,6 @@ from memorious.helpers import ...
 - `parse_date`: Parse a string and return a string representing the date and time. Optional: use format codes.
 - `iso_date`: Return a date string in ISO 8601 format.
 - `make_id`: Make a string key out of many criteria.
-
-#### OCR
-
-```python
-from memorious.helpers.ocr import read_text
-from memorious.helpers.ocr import read_word
-```
-
-Memorious contains some helpers that use [tesserocr](https://github.com/sirfz/tesserocr) to OCR images. `tesserocr` depends on Tesseract version 0.3.4+.
-
-- `read_word`: OCR a single word from an image.
-- `read_text`: OCR text from an image.
 
 ## Postprocessing
 

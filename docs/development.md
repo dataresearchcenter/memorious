@@ -7,6 +7,9 @@
 
 Get the code here: [https://github.com/dataresearchcenter/memorious](https://github.com/dataresearchcenter/memorious)
 
+## Changelog since v2.6.4
+- 🔥 Remove ocr feature
+
 ## Licensing
 
 see [LICENSE](https://github.com/dataresearchcenter/memorious/blob/master/LICENSE)
