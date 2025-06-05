@@ -52,7 +52,7 @@ jobs:
     - name: Install dependencies
       run: poetry install --with dev --all-extras
     - name: Run pre-commit hooks
-      run: poetry run pre-commit run
+      run: make pre-commit
     # - name: Lint with flake8
     #   run: make lint
     - name: Test with pytest
