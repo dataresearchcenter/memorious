@@ -68,7 +68,7 @@ def test_parse(context, mocker):
     context.http.result = None
     context.params["store"] = None
     parse(context, data)
-    assert data["url"] == "https://www.iana.org/domains/example"
+    assert data["url"] == "https://iana.org/domains/example"
     assert data["title"] == "Example Domain"
     assert data["description"].startswith("This domain is for")
     assert context.emit.call_count == 3, data
