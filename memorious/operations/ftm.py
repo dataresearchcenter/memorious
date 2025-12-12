@@ -1,24 +1,21 @@
 from banal import ensure_list
 from ftmq.store.fragments import get_fragments as get_ftmstore_dataset
-from ftmq.store.fragments.settings import Settings
+from ftmq.store.fragments.settings import Settings as FtmSettings
 
 from memorious.operations.aleph import get_api
-from memorious.settings import DATASTORE_URI
 
 ORIGIN = "memorious"
 
-settings = Settings()
+ftm_settings = FtmSettings()
 
 
 def get_dataset(context, origin=ORIGIN):
     name = context.get("dataset", context.crawler.name)
     origin = context.get("dataset", origin)
-    # Either use a database URI that has been explicitly set as a
-    # backend, or default to the memorious datastore.
-    database_uri = settings.database_uri
-    if database_uri == "sqlite:///ftm_fragments.db":
-        database_uri = DATASTORE_URI
-    return get_ftmstore_dataset(name, database_uri=database_uri, origin=origin)
+    # Use ftmq's own database_uri setting (FTM_STORE_URI env var)
+    return get_ftmstore_dataset(
+        name, database_uri=ftm_settings.database_uri, origin=origin
+    )
 
 
 def ftm_store(context, data):

@@ -112,6 +112,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest_env]
 DEBUG = 1
+TESTING = 1
 MEMORIOUS_CONFIG_PATH = "./tests/testdata/config"
 MEMORIOUS_BASE_PATH = "./tests/testdata/data"
 MEMORIOUS_DEBUG = true

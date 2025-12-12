@@ -4,9 +4,8 @@ import math
 from servicelayer.cache import make_key
 from servicelayer.jobs import Job
 
-from memorious.core import conn
+from memorious.core import conn, settings
 from memorious.exc import QueueTooBigError
-from memorious.settings import MAX_QUEUE_LENGTH
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class Queue(object):
         job_stage = job.get_stage(stage.namespaced_name)
         job_stage.sync()
         queue_length = job_stage.get_status().get("pending")
-        if queue_length > MAX_QUEUE_LENGTH:
+        if queue_length > settings.max_queue_length:
             msg = "queue for %s:%s too big."
             raise QueueTooBigError(msg % (str(crawler), stage))
         job_stage.queue(payload=data, context=state)

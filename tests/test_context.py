@@ -13,9 +13,9 @@ class TestContext(object):
         with context.load_file(content_hash) as fh:
             assert hasattr(fh, "read")
 
-    def test_dump_load_state(self, context, crawler, stage):
+    def test_dump_load_state(self, context, crawler, stage, manager):
         dump = context.dump_state()
-        new_context = Context.from_state(dump, stage.name)
+        new_context = Context.from_state(dump, stage.name, manager)
         assert isinstance(new_context, Context)
         assert new_context.run_id == context.run_id
         assert new_context.crawler.name == crawler.name

@@ -5,8 +5,10 @@ from urllib.parse import urlparse
 import requests
 import requests_ftp
 
-from memorious import settings
 from memorious.core import get_rate_limit
+from memorious.settings import Settings
+
+settings = Settings()
 
 
 def ftp_fetch(context, data):
@@ -19,7 +21,7 @@ def ftp_fetch(context, data):
 
     resource = urlparse(url).netloc or url
     # a bit weird to have a http rate limit while using ftp
-    limit = context.get("http_rate_limit", settings.HTTP_RATE_LIMIT)
+    limit = context.get("http_rate_limit", settings.http_rate_limit)
     limit = limit / 60  # per minute to per second for stricter enforcement
     rate_limit = get_rate_limit(resource, limit=limit, interval=1, unit=1)
 

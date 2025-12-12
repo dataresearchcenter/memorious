@@ -7,13 +7,12 @@ from normality import safe_filename
 from requests.structures import CaseInsensitiveDict
 from rigour.mime import normalize_mimetype
 
-from memorious import settings
-from memorious.core import storage
+from memorious.core import settings, storage
 
 
 def _get_directory_path(context):
     """Get the storage path from the output."""
-    path = os.path.join(settings.BASE_PATH, "store")
+    path = os.path.join(settings.base_path, "store")
     path = context.params.get("path", path)
     path = os.path.join(path, context.crawler.name)
     path = os.path.abspath(os.path.expandvars(path))

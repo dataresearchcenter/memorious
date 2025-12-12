@@ -1,61 +1,87 @@
-import os
+"""
+Memorious configuration using pydantic-settings.
 
-import pkg_resources
-from servicelayer import env
+All settings can be set via environment variables with MEMORIOUS_ prefix,
+or via Docker secrets in /run/secrets directory.
+"""
+
+from functools import cached_property
+from importlib.metadata import version
+from pathlib import Path
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from servicelayer import settings as sls
 
-###############################################################################
-# Core configuration
-VERSION = pkg_resources.get_distribution("memorious").version
-APP_NAME = env.get("MEMORIOUS_APP_NAME", "memorious")
+# Get version from package metadata
+try:
+    VERSION = version("memorious")
+except Exception:
+    VERSION = "0.0.0"
 
-# Enable debug logging etc.
-DEBUG = env.to_bool("MEMORIOUS_DEBUG", default=False)
-TESTING = False
 
-# Base operating path
-BASE_PATH = os.path.join(os.getcwd(), "data")
-BASE_PATH = env.get("MEMORIOUS_BASE_PATH", BASE_PATH)
+class Settings(BaseSettings):
+    """
+    Memorious configuration using pydantic-settings.
 
-# Override servicelayer archive if undefined
-sls.ARCHIVE_PATH = sls.ARCHIVE_PATH or os.path.join(BASE_PATH, "archive")
+    Settings are loaded from (in order of priority, highest first):
+    1. Environment variables with MEMORIOUS_ prefix
+    2. .env file
+    3. Docker secrets in /run/secrets directory
 
-# Directory which contains crawler pipeline YAML specs
-CONFIG_PATH = env.get("MEMORIOUS_CONFIG_PATH")
+    For Docker secrets, create a secret file named after the setting
+    (with memorious_ prefix), e.g., /run/secrets/memorious_tags_uri
+    """
 
-# Try and run scrapers in a way that only acquires new data
-INCREMENTAL = env.to_bool("MEMORIOUS_INCREMENTAL", default=True)
+    model_config = SettingsConfigDict(
+        env_prefix="memorious_",
+        env_nested_delimiter="__",
+        env_file=".env",
+        secrets_dir="/run/secrets",
+        extra="ignore",
+    )
 
-# Continue running the crawler even when we encounter an error
-CONTINUE_ON_ERROR = env.to_bool("MEMORIOUS_CONTINUE_ON_ERROR", default=False)
+    # Core configuration
+    app_name: str = Field(default="memorious")
+    debug: bool = Field(default=False)
+    testing: bool = Field(default=False, alias="testing")
+    base_path: Path = Field(default_factory=lambda: Path.cwd() / "data")
+    config_path: Path | None = Field(default=None)
 
-# How many days until an incremental crawl expires
-EXPIRE = env.to_int("MEMORIOUS_EXPIRE", 1)
+    # Crawl behavior
+    incremental: bool = Field(default=True)
+    continue_on_error: bool = Field(default=False)
+    expire: int = Field(default=1, description="Days until incremental crawl expires")
 
-# How many db inserts per minute
-DB_RATE_LIMIT = env.to_int("MEMORIOUS_DB_RATE_LIMIT", 6000)
+    # Rate limiting
+    db_rate_limit: int = Field(default=6000)
+    http_rate_limit: int = Field(default=120)
+    max_queue_length: int = Field(default=50000)
 
-# How many http requests to a host per minute
-HTTP_RATE_LIMIT = env.to_int("MEMORIOUS_HTTP_RATE_LIMIT", 120)
+    # HTTP configuration
+    http_cache: bool = Field(default=True)
+    http_timeout: float = Field(default=30.0)
+    user_agent: str = Field(
+        default="Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.1) "
+        f"aleph.memorious/{VERSION}"
+    )
 
-# Max number of tasks in a stage's task queue
-MAX_QUEUE_LENGTH = env.to_int("MEMORIOUS_MAX_QUEUE_LENGTH", 50000)
+    # Tags storage for incremental crawling and HTTP caching
+    tags_uri: str | None = Field(default=None)
+    tags_table: str = Field(default="memorious_tags")
 
-# HTTP request configuration
-HTTP_CACHE = env.to_bool("MEMORIOUS_HTTP_CACHE", default=True)
+    @cached_property
+    def archive_path(self) -> Path:
+        return self.base_path / "archive"
 
-# HTTP request timeout
-HTTP_TIMEOUT = float(env.to_int("MEMORIOUS_HTTP_TIMEOUT", 30))
+    @cached_property
+    def resolved_tags_uri(self) -> str:
+        """Tags store URI, defaults to SQLite in base_path."""
+        if self.tags_uri:
+            return self.tags_uri
+        return f"sqlite:///{self.base_path / 'tags.sqlite3'}"
 
-# HTTP user agent default
-USER_AGENT = "Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.1)"
-USER_AGENT = "%s aleph.memorious/%s" % (USER_AGENT, VERSION)
-USER_AGENT = env.get("MEMORIOUS_USER_AGENT", USER_AGENT)
-
-# Datastore: operational data store (ODS) database connection
-DATASTORE_FILE = os.path.join(BASE_PATH, "datastore.sqlite3")
-DATASTORE_URI = "sqlite:///%s" % DATASTORE_FILE
-DATASTORE_URI = env.get("MEMORIOUS_DATASTORE_URI", DATASTORE_URI)
-
-# Tags cache table name
-TAGS_TABLE = env.get("MEMORIOUS_TAGS_TABLE", "memorious_tags")
+    def init_servicelayer(self) -> None:
+        """Initialize servicelayer settings from memorious settings."""
+        if not sls.ARCHIVE_PATH:
+            sls.ARCHIVE_PATH = str(self.archive_path)

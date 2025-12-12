@@ -9,55 +9,53 @@ from servicelayer.rate_limit import RateLimit
 from servicelayer.tags import Tags
 from werkzeug.local import LocalProxy
 
-from memorious import settings
+from memorious.settings import Settings
 
 log = logging.getLogger(__name__)
 
 
-def load_manager():
-    if not hasattr(settings, "_manager"):
-        from memorious.logic.manager import CrawlerManager
-
-        settings._manager = CrawlerManager()
-        if settings.CONFIG_PATH:
-            settings._manager.load_path(settings.CONFIG_PATH)
-    return settings._manager
+def get_settings() -> Settings:
+    """Get cached settings instance."""
+    settings = Settings()
+    settings.init_servicelayer()
+    return settings
 
 
-def load_tags():
-    if not hasattr(settings, "_tags"):
-        settings._tags = Tags(settings.TAGS_TABLE, uri=settings.DATASTORE_URI)
-    return settings._tags
-
-
-def get_crawler():
-    if not hasattr(settings, "_crawler"):
-        return RuntimeError("No current crawler. Quitting.")
-    return settings._crawler
-
-
-def connect_redis():
-    if settings.TESTING:
+def get_conn():
+    """Get cached Redis connection (or FakeRedis for testing)."""
+    settings = get_settings()
+    if settings.testing:
         return get_fakeredis()
     return get_redis()
 
 
-manager = LocalProxy(load_manager)
-tags = LocalProxy(load_tags)
-conn = LocalProxy(connect_redis)
-crawler = LocalProxy(get_crawler)
-
-# File storage layer for blobs on local file system or S3
-storage = init_archive()
+def get_storage():
+    """Get cached archive storage."""
+    settings = get_settings()
+    return init_archive(path=str(settings.archive_path))
 
 
-def init_memorious():
-    if settings.DEBUG:
+def get_tags() -> Tags:
+    """Get cached Tags instance."""
+    settings = get_settings()
+    return Tags(settings.tags_table, uri=settings.resolved_tags_uri)
+
+
+tags = LocalProxy(get_tags)
+conn = LocalProxy(get_conn)
+storage = LocalProxy(get_storage)
+settings = LocalProxy(get_settings)
+
+
+def init_memorious() -> None:
+    """Initialize memorious with logging and plugins."""
+    settings = get_settings()
+    if settings.debug:
         configure_logging(level=logging.DEBUG)
     else:
         configure_logging(level=logging.INFO)
     try:
-        os.makedirs(settings.BASE_PATH)
+        os.makedirs(settings.base_path)
     except Exception:
         pass
     for func in get_extensions("memorious.plugins"):
@@ -65,4 +63,5 @@ def init_memorious():
 
 
 def get_rate_limit(resource, limit=100, interval=60, unit=1):
+    """Get a rate limiter for a resource."""
     return RateLimit(conn, resource, limit=limit, interval=interval, unit=unit)

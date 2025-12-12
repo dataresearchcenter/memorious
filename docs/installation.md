@@ -40,28 +40,39 @@ See [Usage](https://memorious.readthedocs.io/en/latest/usage.html) (or run `memo
 
 ## Environment variables
 
-Your Memorious instance is configured by a set of environment variables that control database connectivity and general principles of how the system operates. You can set all of these in the `Dockerfile`.
+Your Memorious instance is configured by environment variables that control database connectivity and general principles of how the system operates. You can set all of these in the `Dockerfile`.
 
-- `MEMORIOUS_CONFIG_PATH`: a path to crawler pipeline YAML configurations.
-- `MEMORIOUS_DEBUG`: whether to go into a simple mode with task threading disabled. Defaults to `False`.
-- `MEMORIOUS_INCREMENTAL`: executing part of a crawler only once per an interval. Defaults to `True`.
-- `MEMORIOUS_EXPIRE`: how many days until cached crawled data expires. Defaults to 1 day.
-- `MEMORIOUS_HTTP_RATE_LIMIT`: maximum number of http calls to a host per minute. Defaults to 120.
-- `MEMORIOUS_HTTP_CACHE`: HTTP request configuration.
-- `MEMORIOUS_USER_AGENT`: Custom User-Agent string for Memorious.
-- `MEMORIOUS_DATASTORE_URI`: connection path for an operational database for `servicelayer` tags. Defaults to a local `datastore.sqllite3`.
+For a complete list of all available settings, see the [Settings Reference](reference/settings.md).
 
-- `REDIS_URL`: address of Redis instance to use for crawler logs (uses a temporary FakeRedis if missing).
-- `ARCHIVE_TYPE`: either `file`(local file system is used for storage) or `s3`(Amazon S3 is used) or `gs`(Google Cloud Storage is used).
-- `ARCHIVE_PATH`: local directory to use for storage if `ARCHIVE_TYPE` is `file`
-- `ARCHIVE_BUCKET`: bucket name if `ARCHIVE_TYPE` is `s3` or `gs`
-- `AWS_ACCESS_KEY_ID`: AWS Access Key ID. (Only needed if `ARCHIVE_TYPE` is `s3`)
-- `AWS_SECRET_ACCESS_KEY`: AWS Secret Access Key. (Only needed if `ARCHIVE_TYPE` is `s3`)
-- `AWS_REGION`: a regional AWS endpoint. (Only needed if `ARCHIVE_TYPE` is `s3`)
+### Quick Reference
 
-- `ALEPH_HOST`, default is `https://data.occrp.org/`, but any instance
-  of Aleph 2.0 or greater should work.
-- `ALEPH_API_KEY`, a valid API key for use by the upload operation.
+**Core Settings:**
+
+- `MEMORIOUS_CONFIG_PATH`: path to crawler pipeline YAML configurations
+- `MEMORIOUS_BASE_PATH`: base directory for data storage (default: `./data`)
+- `MEMORIOUS_DEBUG`: enable debug mode with single-threaded execution (default: `false`)
+- `MEMORIOUS_INCREMENTAL`: enable incremental crawling (default: `true`)
+- `MEMORIOUS_EXPIRE`: days until cached data expires (default: `1`)
+
+**HTTP Settings:**
+
+- `MEMORIOUS_HTTP_RATE_LIMIT`: max HTTP requests per host per minute (default: `120`)
+- `MEMORIOUS_HTTP_CACHE`: enable HTTP response caching (default: `true`)
+- `MEMORIOUS_USER_AGENT`: custom User-Agent string
+
+**Storage Settings:**
+
+- `MEMORIOUS_TAGS_URI`: database URI for tags/caching (default: SQLite in `BASE_PATH`)
+- `REDIS_URL`: Redis connection URL (uses FakeRedis if not set)
+- `ARCHIVE_TYPE`: storage backend - `file`, `s3`, or `gs` (default: `file`)
+- `ARCHIVE_PATH`: local directory for file storage
+- `ARCHIVE_BUCKET`: S3/GCS bucket name
+
+**Integrations:**
+
+- `FTM_STORE_URI`: database URI for FTM entity storage
+- `ALEPH_HOST`: Aleph instance URL (default: `https://data.occrp.org/`)
+- `ALEPH_API_KEY`: API key for Aleph authentication
 
 ## Shut it down
 

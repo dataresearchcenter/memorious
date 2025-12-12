@@ -10,8 +10,7 @@ from servicelayer.cache import make_key
 from servicelayer.extensions import get_entry_point
 from servicelayer.jobs import Dataset, Job
 
-from memorious import settings
-from memorious.core import conn, tags
+from memorious.core import conn, get_tags, settings
 from memorious.logic.stage import CrawlerStage
 from memorious.model import Crawl, Queue
 
@@ -48,7 +47,7 @@ class Crawler(object):
         self.category = self.config.get("category") or "scrape"
         self.init_stage = self.config.get("init") or "init"
         self.delay = int(self.config.get("delay") or 0)
-        self.expire = int(self.config.get("expire") or settings.EXPIRE) * 84600
+        self.expire = int(self.config.get("expire") or settings.expire) * 84600
         self.stealthy = self.config.get("stealthy") or False
         self.queue = Dataset(conn, self.name)
         self.aggregator_config = self.config.get("aggregator") or {}
@@ -94,22 +93,24 @@ class Crawler(object):
         self.flush_tags()
 
     def flush_tags(self):
-        tags.delete(prefix=make_key(self, "tag"))
+        get_tags().delete(prefix=make_key(self, "tag"))
 
     def cancel(self):
         Crawl.abort_all(self)
         self.queue.cancel()
 
-    def run(self, incremental=None, run_id=None):
+    def run(self, incremental=None, run_id=None, continue_on_error=None):
         """Queue the execution of a particular crawler."""
         state = {
             "crawler": self.name,
             "run_id": run_id or Job.random_id(),
-            "incremental": settings.INCREMENTAL,
-            "continue_on_error": settings.CONTINUE_ON_ERROR,
+            "incremental": settings.incremental,
+            "continue_on_error": settings.continue_on_error,
         }
         if incremental is not None:
             state["incremental"] = incremental
+        if continue_on_error is not None:
+            state["continue_on_error"] = continue_on_error
 
         # Cancel previous runs:
         self.cancel()

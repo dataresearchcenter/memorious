@@ -3,12 +3,9 @@ import uuid
 
 import pytest
 
-from memorious import settings
 from memorious.logic.context import Context
 from memorious.logic.http import ContextHttp
 from memorious.logic.manager import CrawlerManager
-
-settings.TESTING = True
 
 
 def get_crawler_dir():
@@ -17,16 +14,21 @@ def get_crawler_dir():
     return crawler_dir
 
 
-@pytest.fixture(scope="module")
-def crawler_dir():
-    return get_crawler_dir()
+# Module-level manager singleton for tests
+_test_manager: CrawlerManager | None = None
 
 
 def get_manager():
-    manager = CrawlerManager()
-    manager.load_path(get_crawler_dir())
-    settings._manager = manager
-    return manager
+    global _test_manager
+    if _test_manager is None:
+        _test_manager = CrawlerManager()
+        _test_manager.load_path(get_crawler_dir())
+    return _test_manager
+
+
+@pytest.fixture(scope="module")
+def crawler_dir():
+    return get_crawler_dir()
 
 
 @pytest.fixture(scope="module")

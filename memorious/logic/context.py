@@ -11,8 +11,7 @@ from tempfile import mkdtemp
 from servicelayer.cache import make_key
 from servicelayer.util import dump_json, load_json
 
-from memorious import settings
-from memorious.core import manager, storage, tags
+from memorious.core import get_settings, get_storage, get_tags
 from memorious.exc import QueueTooBigError
 from memorious.logic.check import ContextCheck
 from memorious.logic.http import ContextHttp
@@ -33,8 +32,13 @@ class Context(object):
         self.run_id = state.get("run_id") or uuid.uuid1().hex
         self.work_path = mkdtemp()
         self.log = logging.getLogger("%s.%s" % (crawler.name, stage.name))
+
         self.http = ContextHttp(self)
         self.check = ContextCheck(self)
+
+        self.settings = get_settings()
+        self.tags = get_tags()
+        self.storage = get_storage()
 
     def get(self, name, default=None):
         """Get a configuration value and expand environment variables."""
@@ -54,7 +58,7 @@ class Context(object):
         if stage is None or stage not in self.crawler.stages:
             self.log.info("No next stage: %s (%s)", stage, rule)
             return
-        if settings.DEBUG:
+        if self.settings.debug:
             # sampling rate is a float between 0.0 to 1.0. If it's 0.2, we
             # aim to execute only 20% of the crawler's tasks.
             sampling_rate = self.get("sampling_rate")
@@ -115,15 +119,15 @@ class Context(object):
     def set_tag(self, key, value):
         data = dump_json(value)
         key = make_key(self.crawler, "tag", key)
-        return tags.set(key, data)
+        return self.tags.set(key, data)
 
     def get_tag(self, key):
-        value = tags.get(make_key(self.crawler, "tag", key))
+        value = self.tags.get(make_key(self.crawler, "tag", key))
         if value is not None:
             return load_json(value)
 
     def check_tag(self, key):
-        return tags.exists(make_key(self.crawler, "tag", key))
+        return self.tags.exists(make_key(self.crawler, "tag", key))
 
     def skip_incremental(self, *criteria):
         """Perform an incremental check on a set of criteria.
@@ -151,7 +155,7 @@ class Context(object):
     def store_file(self, file_path, content_hash=None):
         """Put a file into permanent storage so it can be visible to other
         stages."""
-        return storage.archive_file(file_path, content_hash=content_hash)
+        return self.storage.archive_file(file_path, content_hash=content_hash)
 
     def store_data(self, data, encoding="utf-8"):
         """Put the given content into a file, possibly encoding it as UTF-8
@@ -172,7 +176,7 @@ class Context(object):
 
     @contextmanager
     def load_file(self, content_hash, file_name=None, read_mode="rb"):
-        file_path = storage.load_file(
+        file_path = self.storage.load_file(
             content_hash, file_name=file_name, temp_path=self.work_path
         )
         if file_path is None:
@@ -182,7 +186,7 @@ class Context(object):
                 with open(file_path, mode=read_mode) as fh:
                     yield fh
             finally:
-                storage.cleanup_file(content_hash, temp_path=self.work_path)
+                self.storage.cleanup_file(content_hash, temp_path=self.work_path)
 
     def dump_state(self):
         state = deepcopy(self.state)
@@ -191,7 +195,14 @@ class Context(object):
         return state
 
     @classmethod
-    def from_state(cls, state, stage):
+    def from_state(cls, state, stage, manager):
+        """Create a Context from serialized state.
+
+        Args:
+            state: Serialized state dict containing crawler name and run_id
+            stage: Stage name to execute
+            manager: CrawlerManager instance to look up crawler
+        """
         state_crawler = state.get("crawler")
         crawler = manager.get(state_crawler)
         if crawler is None:

@@ -16,8 +16,7 @@ from rigour.mime import normalize_mimetype, parse_mimetype
 from servicelayer.cache import make_key
 from servicelayer.settings import REDIS_SHORT
 
-from memorious import settings
-from memorious.core import conn, get_rate_limit, storage
+from memorious.core import conn, get_rate_limit, get_storage, settings
 from memorious.exc import ParseError
 from memorious.helpers.dates import parse_date
 from memorious.helpers.ua import UserAgent
@@ -31,7 +30,7 @@ class ContextHttp(object):
     def __init__(self, context):
         self.context = context
 
-        self.cache = settings.HTTP_CACHE
+        self.cache = settings.http_cache
         if "cache" in context.params:
             self.cache = context.params.get("cache")
 
@@ -41,7 +40,7 @@ class ContextHttp(object):
 
     def reset(self):
         self.session = Session()
-        self.session.headers["User-Agent"] = settings.USER_AGENT
+        self.session.headers["User-Agent"] = settings.user_agent
         if self.context.crawler.stealthy:
             self.session.headers["User-Agent"] = UserAgent().random()
         return self.session
@@ -56,9 +55,11 @@ class ContextHttp(object):
         params=None,
         json=None,
         allow_redirects=True,
-        timeout=settings.HTTP_TIMEOUT,
+        timeout=None,
         lazy=False,
     ):
+        if timeout is None:
+            timeout = settings.http_timeout
         headers = headers or {}
         if is_mapping(params):
             params = list(params.items())
@@ -184,6 +185,7 @@ class ContextHttpResponse(object):
         if self._file_path is not None:
             return self._file_path
         temp_path = self.context.work_path
+        storage = get_storage()
         if self._content_hash is not None:
             self._file_path = storage.load_file(self._content_hash, temp_path=temp_path)
             return self._file_path
@@ -210,7 +212,7 @@ class ContextHttpResponse(object):
 
     def _rate_limit(self, url):
         resource = urlparse(url).netloc or url
-        limit = self.context.get("http_rate_limit", settings.HTTP_RATE_LIMIT)
+        limit = self.context.get("http_rate_limit", settings.http_rate_limit)
         limit = limit / 60  # per minute to per second for stricter enforcement
         rate_limit = get_rate_limit(resource, limit=limit, interval=1, unit=1)
         self.context.enforce_rate_limit(rate_limit)
