@@ -59,11 +59,29 @@ def get_context():
     return ctx
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def context():
+    """Fresh context for each test function to avoid state leakage."""
     return get_context()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def http():
+    """Fresh HTTP client for each test function."""
     return ContextHttp(get_context())
+
+
+@pytest.fixture(scope="session")
+def httpbin_url(httpbin):
+    """Provide httpbin URL from pytest-httpbin fixture.
+
+    pytest-httpbin automatically starts a local httpbin server in a separate
+    thread - no Docker required.
+    """
+    return httpbin.url
+
+
+@pytest.fixture(scope="session")
+def httpbin_secure_url(httpbin_secure, httpbin_ca_bundle):
+    """Provide HTTPS httpbin URL from pytest-httpbin fixture."""
+    return httpbin_secure.url

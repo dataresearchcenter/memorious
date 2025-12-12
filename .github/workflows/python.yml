@@ -16,11 +16,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
-    services:
-      httpbin:
-        image: kennethreitz/httpbin
-        ports:
-          - 80:80
 
     steps:
     - uses: actions/checkout@v4

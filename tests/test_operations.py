@@ -3,38 +3,42 @@ import os
 import shutil
 from unittest.mock import ANY
 
-import pytest
-
 from memorious.core import storage, tags
 from memorious.operations.fetch import fetch, session
 from memorious.operations.initializers import dates, enumerate, seed, sequence
 from memorious.operations.parse import parse
 from memorious.operations.store import cleanup_archive, directory
 
-HTTPBIN = os.environ.get("HTTPBIN", "https://proxy:443")
 
-
-@pytest.mark.parametrize(
-    "url,call_count",
-    [
-        (f"{HTTPBIN}/html", 1),
-        ("https://occrp.org/", 0),
-        (f"{HTTPBIN}/status/418", 0),
-    ],
-)
-def test_fetch(url, call_count, context, mocker):
-    rules = {"pattern": f"{HTTPBIN}/*"}
+def test_fetch_html(context, mocker, httpbin_url):
+    rules = {"pattern": f"{httpbin_url}/*"}
     context.params["rules"] = rules
     mocker.patch.object(context, "emit")
-    fetch(context, {"url": url})
-    assert context.emit.call_count == call_count
+    fetch(context, {"url": f"{httpbin_url}/html"})
+    assert context.emit.call_count == 1
 
 
-def test_session(context, mocker):
+def test_fetch_blocked_domain(context, mocker, httpbin_url):
+    rules = {"pattern": f"{httpbin_url}/*"}
+    context.params["rules"] = rules
+    mocker.patch.object(context, "emit")
+    fetch(context, {"url": "https://occrp.org/"})
+    assert context.emit.call_count == 0
+
+
+def test_fetch_error_status(context, mocker, httpbin_url):
+    rules = {"pattern": f"{httpbin_url}/*"}
+    context.params["rules"] = rules
+    mocker.patch.object(context, "emit")
+    fetch(context, {"url": f"{httpbin_url}/status/418"})
+    assert context.emit.call_count == 0
+
+
+def test_session(context, mocker, httpbin_url):
     context.params["user"] = "user"
     context.params["password"] = "password"
     context.params["user_agent"] = "Godzilla Firehose 0.1"
-    context.params["url"] = f"{HTTPBIN}/get"
+    context.params["url"] = f"{httpbin_url}/get"
     data = {"hello": "world"}
     mocker.patch.object(context.http, "save")
     mocker.patch.object(context, "emit")
@@ -44,18 +48,18 @@ def test_session(context, mocker):
     assert context.http.save.called_one_with()
     assert context.emit.called_one_with(data=data)
     assert context.http.session.headers["User-Agent"] == "Godzilla Firehose 0.1"
-    assert context.http.session.headers["Referer"] == f"{HTTPBIN}/get"
+    assert context.http.session.headers["Referer"] == f"{httpbin_url}/get"
     assert context.http.session.auth == ("user", "password")
 
 
-def test_parse(context, mocker):
+def test_parse(context, mocker, httpbin_url):
     url = "http://example.org/"
     result = context.http.get(url)
     data = result.serialize()
 
     mocker.patch.object(context, "emit")
 
-    rules = {"pattern": f"{HTTPBIN}/*"}
+    rules = {"pattern": f"{httpbin_url}/*"}
     context.params["store"] = rules
     context.params["meta"] = {"title": ".//h1", "description": ".//p"}
     parse(context, data)
@@ -93,13 +97,13 @@ def test_parse_ftm(context, mocker):
     assert props["description"][0].startswith("A Bucharest court")
 
 
-def test_seed(context, mocker):
+def test_seed(context, mocker, httpbin_url):
     context.params["url"] = None
-    context.params["urls"] = [f"{HTTPBIN}/status/%(status)s"]
+    context.params["urls"] = [f"{httpbin_url}/status/%(status)s"]
     mocker.patch.object(context, "emit")
     seed(context, data={"status": 404})
     assert context.emit.call_count == 1
-    context.emit.assert_called_once_with(data={"url": f"{HTTPBIN}/status/404"})
+    context.emit.assert_called_once_with(data={"url": f"{httpbin_url}/status/404"})
 
 
 def test_sequence(context, mocker):
@@ -149,7 +153,7 @@ def test_enumerate(context, mocker):
     # the reference to data dict around and then mutate it.
 
 
-def test_directory(context):
+def test_directory(context, httpbin_url):
     file_path = os.path.realpath(__file__)
     store_dir = os.path.normpath(
         os.path.join(file_path, "../testdata/data/store/occrp_web_site")
@@ -157,7 +161,7 @@ def test_directory(context):
     shutil.rmtree(store_dir, ignore_errors=True)
 
     # echo user-agent
-    url = f"{HTTPBIN}/user-agent"
+    url = f"{httpbin_url}/user-agent"
     result = context.http.get(url, headers={"User-Agent": "Memorious Test"})
     data = result.serialize()
     directory(context, data)
@@ -172,11 +176,12 @@ def test_directory(context):
     with open(meta_file_path, "rb") as fh:
         assert json.load(fh)["content_hash"] == data["content_hash"]
     with open(raw_file_path, "rb") as fh:
-        assert b'"user-agent": "Memorious Test"' in fh.read()
+        raw_content = json.load(fh)
+        assert raw_content["user-agent"] == "Memorious Test"
 
 
-def test_cleanup_archive(context):
-    url = f"{HTTPBIN}/user-agent"
+def test_cleanup_archive(context, httpbin_url):
+    url = f"{httpbin_url}/user-agent"
     result = context.http.get(url, headers={"User-Agent": "Memorious Test"})
     data = result.serialize()
     assert storage.load_file(data["content_hash"]) is not None
