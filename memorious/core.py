@@ -38,6 +38,11 @@ def get_storage():
 def get_tags() -> Tags:
     """Get cached Tags instance."""
     settings = get_settings()
+    # Ensure base_path exists for SQLite tags database
+    try:
+        os.makedirs(settings.base_path, exist_ok=True)
+    except Exception:
+        pass
     return Tags(settings.tags_table, uri=settings.resolved_tags_uri)
 
 
