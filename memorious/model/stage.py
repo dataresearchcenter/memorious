@@ -73,13 +73,6 @@ class CrawlerStage:
         return getattr(module, method)
 
     @property
-    def op_count(self):
-        """Total operations performed for this stage."""
-        from memorious.model import Crawl
-
-        return Crawl.op_count(self.crawler, self)
-
-    @property
     def namespaced_name(self) -> str:
         return f"{self.crawler}.{self.name}"
 

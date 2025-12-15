@@ -30,9 +30,8 @@ memorious/
 ├── settings.py          # Pydantic Settings class
 ├── model/
 │   ├── crawler.py       # CrawlerConfig(ftmq.model.Dataset) pydantic model
-│   ├── stage.py         # StageConfig pydantic model
-│   └── job.py           # CrawlerJob(openaleph_procrastinate.model.Job)
-├── tasks.py             # Single procrastinate task definition
+│   └── stage.py         # StageConfig pydantic model
+├── tasks.py             # Single procrastinate task definition (uses DatasetJob directly)
 ├── logic/
 │   ├── context.py       # Execution context (with Tags/Archive initialized directly)
 │   ├── crawler.py       # Crawler orchestration
@@ -271,64 +270,20 @@ class StageConfig(BaseModel):
 
 ---
 
-## Phase 3: Replace Worker/Queue with openaleph-procrastinate
+## Phase 3: Replace Worker/Queue with openaleph-procrastinate ✅ COMPLETE
 
 This is the most significant change. The current architecture uses servicelayer's Redis-based job queue. We'll replace it with procrastinate (PostgreSQL-backed).
 
-### 3.1 Create Job Model
+### 3.1 Job Model
 
-**Target** (`memorious/model/job.py`):
-```python
-from typing import Any
+Uses `DatasetJob` from openaleph-procrastinate directly. The `dataset` field stores the crawler name, and the `payload` dict contains:
+- `stage`: Stage name to execute
+- `run_id`: Unique run identifier
+- `incremental`: Whether to skip already-processed items
+- `continue_on_error`: Whether to continue on errors
+- `data`: Stage input data dict
 
-from openaleph_procrastinate.model import Job
-from pydantic import Field
-
-
-class CrawlerJob(Job):
-    """
-    A memorious crawler task job.
-
-    Inherits from openaleph_procrastinate.Job to integrate with the task queue.
-    """
-
-    crawler: str = Field(..., description="Crawler name")
-    stage: str = Field(..., description="Stage name to execute")
-    run_id: str = Field(..., description="Unique run identifier")
-    incremental: bool = Field(default=True)
-    continue_on_error: bool = Field(default=False)
-
-    # Stage input data
-    data: dict[str, Any] = Field(default_factory=dict)
-
-    @classmethod
-    def create(
-        cls,
-        crawler: str,
-        stage: str,
-        run_id: str,
-        data: dict[str, Any],
-        queue: str = "memorious",
-        task: str = "memorious.tasks.execute_stage",
-        **context: Any,
-    ) -> "CrawlerJob":
-        """Create a new crawler job."""
-        return cls(
-            queue=queue,
-            task=task,
-            crawler=crawler,
-            stage=stage,
-            run_id=run_id,
-            data=data,
-            payload={
-                "crawler": crawler,
-                "stage": stage,
-                "run_id": run_id,
-                "data": data,
-                **context,
-            },
-        )
-```
+No custom job model subclass needed.
 
 ### 3.2 Create Tasks Module
 
@@ -1110,29 +1065,30 @@ def show_settings():
 
 ## Migration Checklist
 
-### Phase 1: Settings
-- [ ] Create pydantic Settings class
-- [ ] Update all settings imports
-- [ ] Remove servicelayer.env usage
-- [ ] Update tests
+### Phase 1: Settings ✅ COMPLETE
+- [x] Create pydantic Settings class
+- [x] Update all settings imports
+- [x] Remove servicelayer.env usage
+- [x] Update tests
 
-### Phase 2: Crawler Models
-- [ ] Create CrawlerConfig model
-- [ ] Create StageConfig model
-- [ ] Update CrawlerManager
-- [ ] Update YAML loading
-- [ ] Update tests
+### Phase 2: Crawler Models ✅ COMPLETE
+- [x] Create CrawlerConfig model (inherits from ftmq.model.Dataset)
+- [x] Create StageConfig model
+- [x] Update CrawlerManager
+- [x] Update YAML loading (uses Dataset.from_yaml_uri())
+- [x] Update tests
 
-### Phase 3: Procrastinate Integration
-- [ ] Add openaleph-procrastinate dependency
-- [ ] Create CrawlerJob model
-- [ ] Create tasks.py module
-- [ ] Refactor Context.emit()
-- [ ] Remove worker.py
-- [ ] Remove model/queue.py
-- [ ] Update CLI
-- [ ] Setup procrastinate migrations
-- [ ] Update tests
+### Phase 3: Procrastinate Integration ✅ COMPLETE
+- [x] Add openaleph-procrastinate dependency
+- [x] Create tasks.py module with execute_stage task and defer_stage helper
+- [x] Use DatasetJob directly (payload contains stage, run_id, data, incremental, continue_on_error)
+- [x] Refactor Context.emit() to use defer_stage()
+- [x] Remove worker.py
+- [x] Remove model/queue.py
+- [x] Remove model/run.py (abort logic now via openaleph_procrastinate.manage.cancel_jobs)
+- [x] Update CLI (added worker command, removed status/killthekitten)
+- [x] Update Crawler.cancel() to use cancel_jobs(dataset=self.name)
+- [x] Update tests (removed test_reporting.py)
 
 ### Phase 4: Tags Migration
 - [ ] Update Context to initialize anystore.Tags directly

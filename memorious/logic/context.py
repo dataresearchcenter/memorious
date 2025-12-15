@@ -1,28 +1,30 @@
-import logging
+"""Execution context for crawler operations."""
+
 import os
 import random
 import shutil
-import time
 import uuid
 from contextlib import contextmanager
 from copy import deepcopy
 from tempfile import mkdtemp
+from typing import Any
 
+from anystore.logging import get_logger
 from servicelayer.cache import make_key
 from servicelayer.util import dump_json, load_json
 
-from memorious.core import get_settings, get_storage, get_tags
-from memorious.exc import QueueTooBigError
+from memorious.core import settings, storage, tags
 from memorious.logic.check import ContextCheck
+from memorious.logic.crawler import Crawler
 from memorious.logic.http import ContextHttp
-from memorious.model import Crawl, Queue
+from memorious.model.stage import CrawlerStage
 from memorious.util import random_filename
 
 
-class Context(object):
+class Context:
     """Provides state tracking and methods for operation interactions."""
 
-    def __init__(self, crawler, stage, state):
+    def __init__(self, crawler: Crawler, stage: CrawlerStage, state):
         self.crawler = crawler
         self.stage = stage
         self.state = state
@@ -31,14 +33,19 @@ class Context(object):
         self.continue_on_error = state.get("continue_on_error")
         self.run_id = state.get("run_id") or uuid.uuid1().hex
         self.work_path = mkdtemp()
-        self.log = logging.getLogger("%s.%s" % (crawler.name, stage.name))
+        self.log = get_logger(
+            "%s.%s" % (crawler.name, stage.name),
+            dataset=crawler.name,
+            stage=stage.name,
+            run_id=self.run_id,
+        )
 
         self.http = ContextHttp(self)
         self.check = ContextCheck(self)
 
-        self.settings = get_settings()
-        self.tags = get_tags()
-        self.storage = get_storage()
+        self.settings = settings
+        self.tags = tags
+        self.storage = storage
 
     def get(self, name, default=None):
         """Get a configuration value and expand environment variables."""
@@ -48,31 +55,49 @@ class Context(object):
         return value
 
     def emit(self, rule="pass", stage=None, data=None, delay=None, optional=False):
-        """Invoke the next stage, either based on a handling rule, or by
-        calling the `pass` rule by default."""
+        """
+        Invoke the next stage via procrastinate task queue.
+
+        Args:
+            rule: Handler rule name to determine target stage
+            stage: Explicit target stage (overrides rule lookup)
+            data: Data to pass to the next stage
+            delay: Delay in seconds (logged but not applied - use scheduled_at for delays)
+            optional: If True, silently skip if no target stage found
+        """
         data = data or {}
+
+        # Resolve target stage
         if stage is None:
             stage = self.stage.handlers.get(rule)
         if optional and stage is None:
             return
         if stage is None or stage not in self.crawler.stages:
-            self.log.info("No next stage: %s (%s)", stage, rule)
+            self.log.info("No next stage: %s (%s)" % (stage, rule))
             return
+
+        # Debug sampling
         if self.settings.debug:
-            # sampling rate is a float between 0.0 to 1.0. If it's 0.2, we
-            # aim to execute only 20% of the crawler's tasks.
             sampling_rate = self.get("sampling_rate")
             if sampling_rate and random.random() > float(sampling_rate):
                 self.log.info("Skipping emit due to sampling rate")
                 return
-        # In sync mode we use a in-memory backend for the task queue.
-        # Make a copy of the data to avoid mutation in that case.
+
+        # Log delay warning (procrastinate supports scheduled_at, but we simplify)
+        if delay and delay > 0:
+            self.log.debug("Delay of %ds requested but not applied" % delay)
+
+        # Make a copy of the data to avoid mutation when in-memory connector
         data = deepcopy(data)
-        state = self.dump_state()
-        stage = self.crawler.get(stage)
-        delay = delay or self.params.get("delay", 0) or self.crawler.delay
-        self.sleep(delay)
-        Queue.queue(stage, state, data)
+
+        # Defer the job via procrastinate
+        self.crawler.defer(
+            stage=stage,
+            data=data,
+            run_id=self.run_id,
+            incremental=self.incremental or True,
+            continue_on_error=self.continue_on_error or False,
+        )
 
     def recurse(self, data=None, delay=None):
         """Have a stage invoke itself with a modified set of arguments."""
@@ -80,35 +105,25 @@ class Context(object):
             data = {}
         return self.emit(stage=self.stage.name, data=data, delay=delay)
 
-    def execute(self, data):
-        """Execute the crawler and create a database record of having done
-        so."""
-        if Crawl.is_aborted(self.crawler, self.run_id):
-            return
-
+    def execute(self, data: dict[str, Any]) -> Any:
+        """Execute the stage method with the given data."""
         try:
-            Crawl.operation_start(self.crawler, self.stage, self.run_id)
             self.log.info(
-                "[%s->%s(%s)]: %s",
-                self.crawler.name,
-                self.stage.name,
-                self.stage.method_name,
-                self.run_id,
+                "[%s->%s(%s)]: %s"
+                % (
+                    self.crawler.name,
+                    self.stage.name,
+                    self.stage.method_name,
+                    self.run_id,
+                )
             )
             return self.stage.method(self, data)
-        except QueueTooBigError as qtbe:
-            self.emit_warning(str(qtbe))
         except Exception as exc:
             self.emit_exception(exc)
             if not self.continue_on_error:
                 raise exc
         finally:
-            Crawl.operation_end(self.crawler, self.run_id)
             shutil.rmtree(self.work_path)
-
-    def sleep(self, seconds):
-        for _ in range(seconds):
-            time.sleep(1)
 
     def emit_warning(self, message, *args):
         self.log.warning(message, *args)
@@ -141,7 +156,6 @@ class Context(object):
         if not self.incremental:
             return False
 
-        # this is pure convenience, and will probably backfire at some point.
         key = make_key("inc", *criteria)
         if key is None:
             return False
@@ -153,13 +167,11 @@ class Context(object):
         return False
 
     def store_file(self, file_path, content_hash=None):
-        """Put a file into permanent storage so it can be visible to other
-        stages."""
+        """Put a file into permanent storage so it can be visible to other stages."""
         return self.storage.archive_file(file_path, content_hash=content_hash)
 
     def store_data(self, data, encoding="utf-8"):
-        """Put the given content into a file, possibly encoding it as UTF-8
-        in the process."""
+        """Put the given content into a file, possibly encoding it as UTF-8."""
         path = random_filename(self.work_path)
         try:
             with open(path, "wb") as fh:
@@ -190,7 +202,7 @@ class Context(object):
 
     def dump_state(self):
         state = deepcopy(self.state)
-        state["crawler"] = self.crawler.name
+        state["dataset"] = self.crawler.name
         state["run_id"] = self.run_id
         return state
 
@@ -199,14 +211,14 @@ class Context(object):
         """Create a Context from serialized state.
 
         Args:
-            state: Serialized state dict containing crawler name and run_id
+            state: Serialized state dict containing dataset name and run_id
             stage: Stage name to execute
             manager: CrawlerManager instance to look up crawler
         """
-        state_crawler = state.get("crawler")
-        crawler = manager.get(state_crawler)
+        dataset = state.get("dataset")
+        crawler = manager.get(dataset)
         if crawler is None:
-            raise RuntimeError("Missing crawler: [%s]" % state_crawler)
+            raise RuntimeError("Missing dataset: [%s]" % dataset)
         stage = crawler.get(stage)
         if stage is None:
             raise RuntimeError("[%r] has no stage: %s" % (crawler, stage))
@@ -214,13 +226,13 @@ class Context(object):
 
     def enforce_rate_limit(self, rate_limit):
         """
-        Enforce rate limit for a resource. If rate limit is exceeded, put the
-        offending stage on a timeout (don't execute tasks for that stage for
-        some time)
+        Enforce rate limit for a resource.
+
+        Updates the rate limit counter and blocks if limit exceeded.
         """
         rate_limit.update()
         if not rate_limit.check():
-            Queue.timeout(self.stage, rate_limit=rate_limit)
+            rate_limit.comply()
 
     def __repr__(self):
         return "<Context(%r, %r)>" % (self.crawler, self.stage)

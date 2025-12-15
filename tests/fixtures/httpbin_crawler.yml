@@ -1,0 +1,23 @@
+name: httpbin_test
+title: HTTPBin Test Crawler
+description: A minimal crawler that fetches from httpbin for testing
+
+init: seed
+
+pipeline:
+  seed:
+    method: seed
+    params:
+      url: "${HTTPBIN_URL}/get"
+    handle:
+      pass: fetch
+
+  fetch:
+    method: fetch
+    handle:
+      pass: store
+
+  store:
+    method: directory
+    params:
+      path: ./tests/testdata/data/httpbin_output

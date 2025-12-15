@@ -15,14 +15,16 @@ class CrawlerManager(object):
         self.crawlers = {}
 
     def load_path(self, path):
-        if not os.path.isdir(path):
+        path = Path(path).resolve()  # Convert to absolute path
+        if not path.is_dir():
             log.warning("Crawler config path %s not found.", path)
+            return
 
         for root, _, file_names in os.walk(path):
             for file_name in file_names:
                 if not (fnmatch(file_name, "*.yaml") or fnmatch(file_name, "*.yml")):
                     continue
-                source_file = os.path.join(root, file_name)
+                source_file = Path(root) / file_name
                 try:
                     crawler = Crawler(self, source_file)
                 except ValueError:
