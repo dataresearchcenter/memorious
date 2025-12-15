@@ -131,14 +131,14 @@ class Context:
         self.log.exception(exc)
 
     def set_tag(self, key: str, value: Any):
-        key = make_key(self.crawler, "tag", key)
+        key = make_key(self.crawler.name, "tag", key)
         return self.tags.put(key, value)
 
     def get_tag(self, key: str) -> Any:
-        return self.tags.get(make_key(self.crawler, "tag", key))
+        return self.tags.get(make_key(self.crawler.name, "tag", key))
 
     def check_tag(self, key):
-        return self.tags.exists(make_key(self.crawler, "tag", key))
+        return self.tags.exists(make_key(self.crawler.name, "tag", key))
 
     def skip_incremental(self, *criteria):
         """Perform an incremental check on a set of criteria.
