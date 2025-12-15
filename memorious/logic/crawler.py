@@ -1,89 +1,102 @@
-import io
-import logging
-import os
-import re
-from datetime import timedelta
-from importlib import import_module
+"""Crawler orchestration and runtime management."""
 
-import yaml
+import logging
+from importlib import import_module
+from pathlib import Path
+
 from servicelayer.cache import make_key
 from servicelayer.extensions import get_entry_point
 from servicelayer.jobs import Dataset, Job
 
-from memorious.core import conn, get_tags, settings
-from memorious.logic.stage import CrawlerStage
-from memorious.model import Crawl, Queue
+from memorious.core import conn, settings, tags
+from memorious.model import Crawl, CrawlerConfig, CrawlerStage, Queue
 
 log = logging.getLogger(__name__)
 
 
-class Crawler(object):
-    """A processing graph that constitutes a crawler."""
+class Crawler:
+    """A processing graph that constitutes a crawler.
 
-    SCHEDULES = {
-        "disabled": None,
-        "hourly": timedelta(hours=1),
-        "daily": timedelta(days=1),
-        "weekly": timedelta(weeks=1),
-        "monthly": timedelta(weeks=4),
-    }
+    Wraps CrawlerConfig with runtime state and operations.
+    """
 
-    def __init__(self, manager, source_file):
+    def __init__(self, manager, source_file: str | Path):
         self.manager = manager
-        self.source_file = source_file
-        with io.open(source_file, encoding="utf-8") as fh:
-            self.config_yaml = fh.read()
-            self.config = yaml.safe_load(self.config_yaml)
+        self.source_file = Path(source_file)
 
-        self.name = os.path.basename(source_file)
-        # YAML keys with undefined values will be parsed as `None`.
-        # eg: with the yaml definition `name: `, `config.get("name", "default_value")`
-        # will evaluate to `None` instead of `default_value`.
-        # So in order to avoid setting `self.name` to `None`, we use `or` to
-        # set the default instead of passing it to `config.get()`
-        self.name = self.config.get("name") or self.name
-        self.validate_name()
-        self.description = self.config.get("description") or self.name
-        self.category = self.config.get("category") or "scrape"
-        self.init_stage = self.config.get("init") or "init"
-        self.delay = int(self.config.get("delay") or 0)
-        self.expire = int(self.config.get("expire") or settings.expire) * 84600
-        self.stealthy = self.config.get("stealthy") or False
+        # Load and parse config using anystore's from_yaml_uri
+        self.config = CrawlerConfig.from_yaml_uri(self.source_file.as_uri())
+
+        # Runtime state
         self.queue = Dataset(conn, self.name)
-        self.aggregator_config = self.config.get("aggregator") or {}
 
+        # Build stage objects
         self.stages = {}
-        for name, stage in self.config.get("pipeline", {}).items():
-            self.stages[name] = CrawlerStage(self, name, stage)
+        for stage_name, stage_config in self.config.pipeline.items():
+            self.stages[stage_name] = CrawlerStage(self, stage_name, stage_config)
 
-    def validate_name(self):
-        if not re.match(r"^[A-Za-z0-9_-]+$", self.name):
-            raise ValueError(
-                "Invalid crawler name: %s. "
-                "Allowed characters: A-Za-z0-9_-" % self.name
-            )
+    # Delegate to config properties
+    @property
+    def name(self) -> str:
+        return self.config.name
+
+    @property
+    def description(self) -> str:
+        return self.config.title or self.name
+
+    @property
+    def category(self) -> str | None:
+        return self.config.category
+
+    @property
+    def init_stage(self) -> str:
+        return self.config.init
+
+    @property
+    def delay(self) -> int:
+        return self.config.delay
+
+    @property
+    def expire(self) -> int:
+        """Expire time in seconds."""
+        # Use config expire (in days) or fall back to settings
+        expire_days = self.config.expire or settings.expire
+        return expire_days * 86400
+
+    @property
+    def stealthy(self) -> bool:
+        return self.config.stealthy
+
+    @property
+    def aggregator_config(self) -> dict:
+        if self.config.aggregator:
+            return {
+                "method": self.config.aggregator.method,
+                "params": self.config.aggregator.params,
+            }
+        return {}
 
     @property
     def aggregator_method(self):
-        if self.aggregator_config:
-            method = self.aggregator_config.get("method")
-            if not method:
-                return
-            # method A: via a named Python entry point
-            func = get_entry_point("memorious.operations", method)
-            if func is not None:
-                return func
-            # method B: direct import from a module
-            if ":" in method:
-                package, method = method.rsplit(":", 1)
-                module = import_module(package)
-                return getattr(module, method)
-            raise ValueError("Unknown method: %s", self.method_name)
+        if not self.config.aggregator:
+            return None
+
+        method = self.config.aggregator.method
+        # method A: via a named Python entry point
+        func = get_entry_point("memorious.operations", method)
+        if func is not None:
+            return func
+        # method B: direct import from a module
+        if ":" in method:
+            package, method_name = method.rsplit(":", 1)
+            module = import_module(package)
+            return getattr(module, method_name)
+        raise ValueError(f"Unknown method: {method}")
 
     def aggregate(self, context):
         if self.aggregator_method:
-            log.info("Running aggregator for %s" % self.name)
-            params = self.aggregator_config.get("params", {})
+            log.info("Running aggregator for %s", self.name)
+            params = self.config.aggregator.params if self.config.aggregator else {}
             self.aggregator_method(context, params)
 
     def flush(self):
@@ -93,7 +106,7 @@ class Crawler(object):
         self.flush_tags()
 
     def flush_tags(self):
-        get_tags().delete(prefix=make_key(self, "tag"))
+        tags.delete(prefix=make_key(self, "tag"))
 
     def cancel(self):
         Crawl.abort_all(self)
@@ -118,7 +131,7 @@ class Crawler(object):
         Queue.queue(init_stage, state, {})
 
     @property
-    def is_running(self):
+    def is_running(self) -> bool:
         """Is the crawler currently running?"""
         for job in self.queue.get_jobs():
             if not job.is_done():
@@ -131,7 +144,7 @@ class Crawler(object):
 
     @property
     def op_count(self):
-        """Total operations performed for this crawler"""
+        """Total operations performed for this crawler."""
         return Crawl.op_count(self)
 
     @property
@@ -147,14 +160,14 @@ class Crawler(object):
         status = self.queue.get_status()
         return status.get("pending")
 
-    def get(self, name):
+    def get(self, name: str) -> CrawlerStage | None:
         return self.stages.get(name)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
     def __iter__(self):
         return iter(self.stages.values())
 
-    def __repr__(self):
-        return "<Crawler(%s)>" % self.name
+    def __repr__(self) -> str:
+        return f"<Crawler({self.name})>"

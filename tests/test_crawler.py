@@ -1,7 +1,7 @@
 import os
 
-from memorious.logic.manager import Crawler
-from memorious.logic.stage import CrawlerStage
+from memorious.logic.crawler import Crawler
+from memorious.model import CrawlerStage
 
 
 class TestCrawler(object):

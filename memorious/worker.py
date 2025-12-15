@@ -4,7 +4,7 @@ from servicelayer.worker import Worker
 
 from memorious.core import conn
 from memorious.logic.context import Context
-from memorious.logic.stage import CrawlerStage
+from memorious.model import CrawlerStage
 
 log = structlog.get_logger(__name__)
 

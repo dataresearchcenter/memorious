@@ -27,7 +27,7 @@ class TestContext(object):
     def test_execute(self, context, mocker):
         data = {"answer": 42}
         mocker.patch(
-            "memorious.logic.stage.CrawlerStage.method",
+            "memorious.model.stage.CrawlerStage.method",
             new_callable=mocker.PropertyMock,
         )
         context.execute(data)

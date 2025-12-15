@@ -1,6 +1,7 @@
 import logging
 import os
 from fnmatch import fnmatch
+from pathlib import Path
 
 from memorious.logic.crawler import Crawler
 
@@ -29,7 +30,8 @@ class CrawlerManager(object):
                     continue
                 self.crawlers[crawler.name] = crawler
 
-    def load_crawler(self, path):
+    def load_crawler(self, path: str | Path) -> Crawler | None:
+        path = Path(path)
         if path.is_file():
             if fnmatch(path.name, "*.yaml") or fnmatch(path.name, "*.yml"):
                 try:
@@ -44,6 +46,7 @@ class CrawlerManager(object):
             log.warning("Crawler path %s is not a yaml file", path)
         else:
             log.warning("Crawler path %s is not a valid file path", path)
+        return None
 
     def __getitem__(self, name):
         return self.crawlers.get(name)
