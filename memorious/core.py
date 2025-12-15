@@ -1,12 +1,13 @@
 import logging
 import os
 
+from anystore.tags import Tags
+from anystore.tags import get_tags as _get_tags
 from servicelayer.archive import init_archive
 from servicelayer.cache import get_fakeredis, get_redis
 from servicelayer.extensions import get_extensions
 from servicelayer.logs import configure_logging
 from servicelayer.rate_limit import RateLimit
-from servicelayer.tags import Tags
 from werkzeug.local import LocalProxy
 
 from memorious.settings import Settings
@@ -43,7 +44,7 @@ def get_tags() -> Tags:
         os.makedirs(settings.base_path, exist_ok=True)
     except Exception:
         pass
-    return Tags(settings.tags_table, uri=settings.resolved_tags_uri)
+    return _get_tags(settings.resolved_tags_uri)
 
 
 tags = LocalProxy(get_tags)

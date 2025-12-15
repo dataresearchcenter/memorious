@@ -115,6 +115,7 @@ DEBUG = 1
 TESTING = 1
 MEMORIOUS_CONFIG_PATH = "./tests/testdata/config"
 MEMORIOUS_BASE_PATH = "./tests/testdata/data"
+MEMORIOUS_TAGS_URI = "memory://"
 MEMORIOUS_DEBUG = true
 PROCRASTINATE_SYNC = 1
 PROCRASTINATE_DB_URI = "memory:"

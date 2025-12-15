@@ -66,9 +66,8 @@ class Settings(BaseSettings):
         f"aleph.memorious/{VERSION}"
     )
 
-    # Tags storage for incremental crawling and HTTP caching
     tags_uri: str | None = Field(default=None)
-    tags_table: str = Field(default="memorious_tags")
+    """Tags storage for incremental crawling and HTTP caching."""
 
     @cached_property
     def archive_path(self) -> Path:

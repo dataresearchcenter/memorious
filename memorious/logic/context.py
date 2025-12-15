@@ -10,8 +10,7 @@ from tempfile import mkdtemp
 from typing import Any
 
 from anystore.logging import get_logger
-from servicelayer.cache import make_key
-from servicelayer.util import dump_json, load_json
+from anystore.util import join_relpaths as make_key
 
 from memorious.core import settings, storage, tags
 from memorious.logic.check import ContextCheck
@@ -131,15 +130,12 @@ class Context:
     def emit_exception(self, exc):
         self.log.exception(exc)
 
-    def set_tag(self, key, value):
-        data = dump_json(value)
+    def set_tag(self, key: str, value: Any):
         key = make_key(self.crawler, "tag", key)
-        return self.tags.set(key, data)
+        return self.tags.put(key, value)
 
-    def get_tag(self, key):
-        value = self.tags.get(make_key(self.crawler, "tag", key))
-        if value is not None:
-            return load_json(value)
+    def get_tag(self, key: str) -> Any:
+        return self.tags.get(make_key(self.crawler, "tag", key))
 
     def check_tag(self, key):
         return self.tags.exists(make_key(self.crawler, "tag", key))
