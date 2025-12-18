@@ -5,11 +5,11 @@ from __future__ import annotations
 import os
 import random
 import shutil
-import uuid
 from copy import deepcopy
+from datetime import datetime
 from pathlib import Path
 from tempfile import mkdtemp
-from typing import IO, Any, ContextManager
+from typing import IO, Any, ContextManager, overload
 
 from anystore.logging import get_logger
 from anystore.store.base import BaseStore
@@ -28,6 +28,7 @@ from memorious.logic.crawler import Crawler
 from memorious.logic.http import ContextHttp
 from memorious.model.stage import CrawlerStage
 from memorious.settings import Settings
+from memorious.util import make_url_key
 
 DEFAULT_ORIGIN = "memorious"
 CACHE_ORIGIN = "memorious-cache"
@@ -59,7 +60,7 @@ class Context:
         self.params = stage.params
         self.incremental = state.get("incremental")
         self.continue_on_error = state.get("continue_on_error")
-        self.run_id = state.get("run_id") or uuid.uuid1().hex
+        self.run_id = state.get("run_id") or ensure_uuid()
         self.work_path = mkdtemp()
         self.log = get_logger(
             "%s.%s" % (crawler.name, stage.name),
@@ -82,6 +83,48 @@ class Context:
         if isinstance(value, str):
             value = os.path.expandvars(value)
         return value
+
+    @overload
+    def make_key(self, __part1: str, *parts: str, prefix: str | None = ...) -> str: ...
+
+    @overload
+    def make_key(self, *, prefix: str | None = ...) -> None: ...
+
+    def make_key(self, *parts: str, prefix: str | None = None) -> str | None:
+        """Create a namespaced key with the crawler name prefix.
+
+        Args:
+            *parts: Key parts to join. If empty/None, returns None.
+            prefix: Optional prefix added after crawler name but not part
+                of the None check. Useful for categorizing keys (e.g. "inc", "emit").
+
+        Returns:
+            Namespaced key string, or None if parts are empty.
+        """
+        key = make_key(*parts)
+        if key is None:
+            return None
+        if prefix:
+            key = make_key(prefix, key)
+        if not key.startswith(self.crawler.name):
+            return make_key(self.crawler.name, key)
+        return key
+
+    def _make_emit_cache_key(self, data: dict[str, Any]) -> str | None:
+        """Generate a cache key for incremental emit tracking.
+
+        Uses content_hash if available, otherwise url, otherwise None.
+        """
+        cache_key = data.get("emit_cache_key")
+        if cache_key:
+            return self.make_key(cache_key, prefix="emit")
+        content_hash = data.get("content_hash")
+        if content_hash:
+            return self.make_key(content_hash, prefix="emit")
+        url = data.get("url")
+        if url:
+            return self.make_key(make_url_key(url), prefix="emit")
+        return None
 
     def emit(
         self,
@@ -112,6 +155,16 @@ class Context:
             self.log.info("No next stage", stage=stage, rule=rule)
             return
 
+        # Incremental: skip if already processed (cache key exists)
+        if self.incremental:
+            cache_key = self._make_emit_cache_key(data)
+            if cache_key and self.check_tag(cache_key):
+                self.log.debug("Skipping emit (incremental)", cache_key=cache_key)
+                return
+            # Store cache key in data for marking complete at store stage
+            if cache_key:
+                data["emit_cache_key"] = cache_key
+
         # Debug sampling
         if self.settings.debug:
             sampling_rate = self.get("sampling_rate")
@@ -134,6 +187,17 @@ class Context:
             incremental=self.incremental or True,
             continue_on_error=self.continue_on_error or False,
         )
+
+    def mark_emit_complete(self, data: dict[str, Any]) -> None:
+        """Mark an emit cache key as complete.
+
+        Called by store operations after successful storage to enable
+        incremental skipping on future runs.
+        """
+        cache_key = data.get("emit_cache_key")
+        if cache_key:
+            self.set_tag(cache_key, datetime.now())
+            self.log.debug("Marked emit complete", cache_key=cache_key)
 
     def recurse(
         self, data: dict[str, Any] | None = None, delay: int | None = None
@@ -165,14 +229,22 @@ class Context:
         self.log.exception(str(exc))
 
     def set_tag(self, key: str, value: Any) -> None:
-        key = make_key(self.crawler.name, key)
-        self.tags.put(key, value)
+        if not key or not key.strip():
+            self.log.warning("Ignoring empty tag key")
+            return
+        self.tags.put(self.make_key(key), value)
 
     def get_tag(self, key: str) -> Any:
-        return self.tags.get(make_key(self.crawler.name, key))
+        if not key or not key.strip():
+            self.log.warning("Ignoring empty tag key")
+            return None
+        return self.tags.get(self.make_key(key))
 
     def check_tag(self, key: str) -> bool:
-        return self.tags.exists(make_key(self.crawler.name, key))
+        if not key or not key.strip():
+            self.log.warning("Ignoring empty tag key")
+            return False
+        return self.tags.exists(self.make_key(key))
 
     def skip_incremental(self, *criteria: str) -> bool:
         """Perform an incremental check on a set of criteria.
@@ -186,7 +258,7 @@ class Context:
         if not self.incremental:
             return False
 
-        key = make_key("inc", *criteria)
+        key = self.make_key(*criteria, prefix="inc")
         if key is None:
             return False
 

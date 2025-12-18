@@ -1,8 +1,6 @@
 from datetime import datetime
 from urllib.parse import urljoin
 
-from anystore.util import join_relpaths as make_key
-
 from memorious.operations import register
 
 API_HOST = "https://api.www.documentcloud.org"
@@ -76,13 +74,9 @@ def documentcloud_query(context, data):
         # In incremental crawling mode, skip processing this document if it has
         # been already fully processed before.  The key we check for is set in
         # `mark_processed` after a document is fully processed.  So the supplied
-        # arguments to `make_key` must match.
+        # arguments to `context.make_key` must match.
         if context.incremental:
-            key = make_key(
-                context.crawler.name,
-                doc["foreign_id"],
-                document.get("file_hash"),
-            )
+            key = context.make_key(doc["foreign_id"], document.get("file_hash"))
             if context.check_tag(key):
                 context.log.info(
                     "Skipping processing of document", foreign_id=doc["foreign_id"]
@@ -114,10 +108,6 @@ def documentcloud_mark_processed(context, data):
     On subsequent runs, we can check and skip processing this document earlier in the
     pipeline.
     """
-    key = make_key(
-        context.crawler.name,
-        data["foreign_id"],
-        data["content_hash"],
-    )
+    key = context.make_key(data["foreign_id"], data["content_hash"])
     context.log.info("Document has been processed", foreign_id=data["foreign_id"])
     context.set_tag(key, "processed")

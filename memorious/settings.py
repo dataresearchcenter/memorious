@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     # HTTP configuration
     http_cache: bool = Field(default=True)
     http_timeout: float = Field(default=30.0)
+    http_proxy: str | None = Field(default=None, description="HTTP/HTTPS proxy URL")
     user_agent: str = Field(
         default="Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.1) "
         f"memorious/{VERSION}"

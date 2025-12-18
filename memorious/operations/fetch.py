@@ -10,14 +10,12 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import httpx
-from anystore.util import join_relpaths as make_key
 from banal import clean_dict, ensure_dict
 from furl import furl
 
 from memorious.helpers.forms import extract_form
 from memorious.helpers.rule import parse_rule
 from memorious.helpers.template import render_template
-from memorious.logic.incremental import should_skip_incremental
 from memorious.operations import register
 
 if TYPE_CHECKING:
@@ -45,7 +43,6 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
         rewrite: URL rewriting configuration with "method" and "data" keys.
             Methods: "template" (Jinja2), "replace" (string replace).
         pagination: Pagination config with "param" key for page number.
-        skip_incremental: Advanced incremental skip configuration.
 
     Example:
         ```yaml
@@ -79,23 +76,18 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
               url: https://example.com/results
               pagination:
                 param: page
-              skip_incremental:
-                key:
-                  data: [doc_id]
-                target: store
             handle:
               pass: parse
         ```
     """
-    # Check incremental skip first
-    if should_skip_incremental(context, data):
-        return
-
     # Apply extra headers
     _apply_headers(context)
 
     # Get URL from params or data
     url = _get_url(context, data)
+    if url is None:
+        context.log.warning("No URL for GET request")
+        return
 
     # Apply pagination
     if "pagination" in context.params:
@@ -153,7 +145,7 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
 
         data.update(result.serialize())
         if url != result.url:
-            tag = make_key(context.run_id, url)
+            tag = context.make_key(context.run_id, url)
             context.set_tag(tag, None)
         context.emit(data=data)
     except httpx.HTTPError as ce:

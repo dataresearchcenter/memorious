@@ -126,7 +126,7 @@ class ContextHttp:
 
     def _get_session_key(self) -> str:
         """Get deterministic session cache key for this crawler/run."""
-        return make_key(self.context.crawler.name, "session", self.context.run_id)
+        return self.context.make_key("session", self.context.run_id)
 
     def _load_session(self) -> SessionModel | None:
         """Load session from cache using pydantic model."""

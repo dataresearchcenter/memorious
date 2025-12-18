@@ -83,6 +83,9 @@ mkdocs-typer2 = "^0.1.6"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.ruff.lint]
+extend-ignore = ["E704"]
+
 [tool.pytest_env]
 DEBUG = 1
 TESTING = 1

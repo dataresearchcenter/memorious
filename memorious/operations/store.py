@@ -17,7 +17,6 @@ from ftm_lakehouse import get_lakehouse
 from normality import safe_filename
 from rigour.mime import normalize_mimetype
 
-from memorious.logic.incremental import mark_incremental_complete
 from memorious.operations import register
 
 if TYPE_CHECKING:
@@ -105,6 +104,10 @@ def directory(context: Context, data: dict[str, Any]) -> None:
         with open(meta_path, "w") as fh:
             json.dump(data, fh)
 
+        # Mark incremental completion
+        context.mark_emit_complete(data)
+        context.emit(data=data)
+
 
 @register("lakehouse")
 def lakehouse(context: Context, data: dict[str, Any]) -> None:
@@ -166,6 +169,9 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         context.log.info(
             "Store [lakehouse]", file=file_name, checksum=file_info.checksum
         )
+
+        # Mark incremental completion
+        context.mark_emit_complete(data)
         context.emit(data=data)
 
 
@@ -224,9 +230,8 @@ def store(context: Context, data: dict[str, Any]) -> None:
         ```
 
     Note:
-        When using advanced incremental crawling (skip_incremental),
-        this operation automatically marks the target as complete,
-        allowing future runs to skip earlier stages.
+        Incremental completion is marked automatically by the underlying
+        storage operations (directory, lakehouse).
     """
     operation = context.params.get("operation", "directory")
 
@@ -236,7 +241,3 @@ def store(context: Context, data: dict[str, Any]) -> None:
         lakehouse(context, data)
     else:
         context.log.error("Unknown store operation", operation=operation)
-        return
-
-    # Mark incremental completion if this is the target stage
-    mark_incremental_complete(context, data)

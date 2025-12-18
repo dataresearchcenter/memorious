@@ -6,6 +6,8 @@ API documentation for all built-in operations.
 
 Operations for starting crawler pipelines.
 
+::: memorious.operations.initializers.init
+
 ::: memorious.operations.initializers.seed
 
 ::: memorious.operations.initializers.enumerate
@@ -225,12 +227,3 @@ Utility modules for operations.
       show_root_heading: true
 
 ---
-
-## Incremental
-
-::: memorious.logic.incremental
-    options:
-      show_root_heading: true
-      members:
-        - should_skip_incremental
-        - mark_incremental_complete

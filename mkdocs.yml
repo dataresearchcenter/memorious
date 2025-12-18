@@ -7,6 +7,7 @@ nav:
   - Installation: installation.md
   - Crawlers: crawler.md
   - Operations: operations.md
+  - Incremental Crawling: incremental.md
   - Development: development.md
   - Reference:
       - CLI: reference/cli.md

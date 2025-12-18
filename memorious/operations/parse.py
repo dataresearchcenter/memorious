@@ -12,14 +12,12 @@ from urllib.parse import quote, urljoin
 
 import jq
 from anystore.logging import get_logger
-from anystore.util import join_relpaths as make_key
 from banal import clean_dict, ensure_dict, ensure_list
 from normality import collapse_spaces
 
 from memorious.helpers.dates import iso_date
 from memorious.helpers.pagination import paginate
 from memorious.helpers.rule import parse_rule
-from memorious.logic.incremental import should_skip_incremental
 from memorious.operations import register
 from memorious.util import make_url_key
 
@@ -79,7 +77,7 @@ def _extract_urls(
                     continue
                 seen.add(url)
 
-                tag = make_key(context.run_id, make_url_key(url))
+                tag = context.make_key(context.run_id, make_url_key(url))
                 if context.check_tag(tag):
                     continue
                 context.set_tag(tag, None)
@@ -226,7 +224,6 @@ def parse_listing(context: Context, data: dict[str, Any]) -> None:
         pagination: Pagination configuration.
         emit: If True, emit each item's data.
         parse_html: If True, extract URLs from items (default: True).
-        skip_incremental: Advanced incremental skip configuration.
 
     Example:
         ```yaml
@@ -247,9 +244,6 @@ def parse_listing(context: Context, data: dict[str, Any]) -> None:
               next_page: fetch
         ```
     """
-    if should_skip_incremental(context, data):
-        return
-
     should_emit = context.params.get("emit") is True
     should_parse_html = context.params.get("parse_html", True) is True
     items_xpath = context.params.get("items")
@@ -262,11 +256,10 @@ def parse_listing(context: Context, data: dict[str, Any]) -> None:
                 item_data = {**data}
                 _extract_metadata(context, item_data, item)
 
-                if not should_skip_incremental(context, item_data):
-                    if should_parse_html:
-                        _extract_urls(context, item_data, item, base_url)
-                    if should_emit:
-                        context.emit(rule="item", data=item_data)
+                if should_parse_html:
+                    _extract_urls(context, item_data, item, base_url)
+                if should_emit:
+                    context.emit(rule="item", data=item_data)
 
             paginate(context, data, result.html)
 
