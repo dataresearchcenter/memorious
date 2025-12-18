@@ -19,6 +19,7 @@ pipeline:
 ```
 
 Operations can be referenced by:
+
 - **Entry point name**: `fetch`, `parse`, `store`
 - **Module path**: `memorious.operations.fetch:fetch`
 - **Custom module**: `myproject.operations:custom_fetch`

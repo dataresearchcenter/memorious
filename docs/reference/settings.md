@@ -56,7 +56,6 @@ Environment variables take precedence over Docker secrets. This allows you to ov
 | `MEMORIOUS_DEBUG` | `bool` | `false` | Enable debug mode with verbose logging |
 | `MEMORIOUS_TESTING` | `bool` | `false` | Enable testing mode |
 | `MEMORIOUS_BASE_PATH` | `Path` | `./data` | Base directory for all data storage |
-| `MEMORIOUS_CONFIG_PATH` | `Path` | `None` | Path to directory containing crawler YAML configuration files |
 
 ### Crawl Behavior
 
@@ -165,7 +164,6 @@ When using Aleph operations (`aleph_emit_document`, `aleph_emit_entity`), config
 ```bash
 export MEMORIOUS_DEBUG=true
 export MEMORIOUS_BASE_PATH=./data
-export MEMORIOUS_CONFIG_PATH=./config
 
 # Use in-memory for everything (default)
 export MEMORIOUS_CACHE_URI=memory://
@@ -178,7 +176,6 @@ export PROCRASTINATE_SYNC=1
 ```bash
 # Core
 export MEMORIOUS_BASE_PATH=/var/lib/memorious
-export MEMORIOUS_CONFIG_PATH=/etc/memorious/config
 export MEMORIOUS_DEBUG=false
 
 # Runtime cache (Redis for multi-worker)
@@ -208,7 +205,6 @@ services:
   memorious:
     image: ghcr.io/dataresearchcenter/memorious:latest
     environment:
-      MEMORIOUS_CONFIG_PATH: /config
       MEMORIOUS_BASE_PATH: /data
       MEMORIOUS_CACHE_URI: redis://redis:6379/0
       MEMORIOUS_TAGS_URI: postgresql://user:pass@postgres/memorious
@@ -216,7 +212,6 @@ services:
       LAKEHOUSE_URI: /data/archive
       FTM_STORE_URI: postgresql://user:pass@postgres/memorious
     volumes:
-      - ./config:/config:ro
       - ./data:/data
     depends_on:
       - postgres
