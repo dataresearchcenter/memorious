@@ -12,7 +12,6 @@ from tempfile import mkdtemp
 from typing import IO, TYPE_CHECKING, Any, ContextManager
 
 from anystore.logging import get_logger
-from anystore.store import get_store
 from anystore.store.base import BaseStore
 from anystore.store.virtual import get_virtual
 from anystore.tags import Tags
@@ -23,7 +22,7 @@ from ftm_lakehouse.service.archive import DatasetArchive
 from servicelayer.rate_limit import RateLimit
 from structlog.stdlib import BoundLogger
 
-from memorious.core import get_tags, settings
+from memorious.core import get_cache, get_tags, settings
 from memorious.logic.check import ContextCheck
 from memorious.logic.crawler import Crawler
 from memorious.logic.http import ContextHttp
@@ -73,13 +72,13 @@ class Context:
             run_id=self.run_id,
         )
 
-        self.http = ContextHttp(self)
-        self.check = ContextCheck(self)
-
         self.settings = settings
         self.archive = get_archive(self.crawler.name)
         self.tags = get_tags(self.crawler.name)
-        self.cache = get_store(settings.cache_uri)
+        self.cache = get_cache()
+
+        self.http = ContextHttp(self)
+        self.check = ContextCheck(self)
 
     def get(self, name: str, default: Any = None) -> Any:
         """Get a configuration value and expand environment variables."""

@@ -1,0 +1,31 @@
+name: httpbin_auth_test
+title: HTTPBin Basic Auth Test Crawler
+description: Tests session persistence with basic auth across stages
+
+init: setup_session
+
+pipeline:
+  setup_session:
+    method: session
+    params:
+      user: testuser
+      password: testpass
+    handle:
+      pass: seed_url
+
+  seed_url:
+    method: seed
+    params:
+      url: "${HTTPBIN_URL}/basic-auth/testuser/testpass"
+    handle:
+      pass: fetch_auth
+
+  fetch_auth:
+    method: fetch
+    handle:
+      pass: store
+
+  store:
+    method: directory
+    params:
+      path: ./tests/testdata/data/httpbin_auth_output

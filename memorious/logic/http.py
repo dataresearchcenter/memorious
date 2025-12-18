@@ -1,4 +1,4 @@
-"""HTTP client with caching and lazy evaluation."""
+"""HTTP client with caching and lazy evaluation using httpx."""
 
 from __future__ import annotations
 
@@ -12,12 +12,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ContextManager
 from urllib.parse import unquote, urlparse, urlsplit
 
+import httpx
 from anystore.util import join_relpaths
 from banal import hash_data, is_mapping
 from lxml import etree, html
 from normality import guess_file_encoding, stringify
-from requests import Request, Session
-from requests.structures import CaseInsensitiveDict
 from rigour.mime import normalize_mimetype, parse_mimetype
 from servicelayer.cache import make_key
 
@@ -26,6 +25,7 @@ from memorious.exc import ParseError
 from memorious.helpers.dates import parse_date
 from memorious.helpers.ua import UserAgent
 from memorious.logic.mime import NON_HTML
+from memorious.model.session import SessionModel
 
 if TYPE_CHECKING:
     from memorious.logic.context import Context
@@ -36,23 +36,42 @@ class ContextHttp:
 
     STATE_SESSION = "_http"
 
-    def __init__(self, context: "Context") -> None:
+    def __init__(self, context: Context) -> None:
         self.context = context
 
         self.cache = settings.http_cache
         if "cache" in context.params:
             self.cache = context.params.get("cache")
 
-        self.session = self._load_session()
-        if self.session is None:
-            self.reset()
+        self._client: httpx.Client | None = None
+        self._session_state: SessionModel | None = self._load_session()
 
-    def reset(self) -> Session:
-        self.session = Session()
-        self.session.headers["User-Agent"] = settings.user_agent
-        if self.context.crawler.stealthy:
-            self.session.headers["User-Agent"] = UserAgent().random()
-        return self.session
+    @property
+    def client(self) -> httpx.Client:
+        """Get or create the httpx Client with session state applied."""
+        if self._client is None:
+            self._client = httpx.Client(
+                verify=False,
+                follow_redirects=True,
+                timeout=settings.http_timeout,
+            )
+            self._client.headers["User-Agent"] = settings.user_agent
+            if self.context.crawler.stealthy:
+                self._client.headers["User-Agent"] = UserAgent().random()
+
+            # Apply saved session state (cookies, headers)
+            if self._session_state:
+                self._session_state.apply_to_client(self._client)
+
+        return self._client
+
+    def reset(self) -> httpx.Client:
+        """Reset the HTTP client, clearing all session state."""
+        if self._client:
+            self._client.close()
+        self._client = None
+        self._session_state = None
+        return self.client
 
     def request(
         self,
@@ -62,7 +81,7 @@ class ContextHttp:
         auth: tuple[str, str] | None = None,
         data: dict[str, Any] | None = None,
         params: dict[str, Any] | list[tuple[str, Any]] | None = None,
-        json: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
         allow_redirects: bool = True,
         timeout: float | None = None,
         lazy: bool = False,
@@ -74,11 +93,24 @@ class ContextHttp:
             params = list(params.items())
 
         method = method.upper().strip()
-        request = Request(
-            method, url, data=data, headers=headers, json=json, auth=auth, params=params
+
+        # Build httpx Request
+        # Note: httpx Request doesn't take auth directly - we pass it to send()
+        request = httpx.Request(
+            method,
+            url,
+            params=params,
+            headers=headers,
+            data=data,
+            json=json_data,
         )
+
         response = ContextHttpResponse(
-            self, request=request, allow_redirects=allow_redirects, timeout=timeout
+            self,
+            request=request,
+            auth=auth,
+            follow_redirects=allow_redirects,
+            timeout=timeout,
         )
         if not lazy:
             response.fetch()
@@ -93,29 +125,28 @@ class ContextHttp:
     def rehash(self, data: dict[str, Any]) -> ContextHttpResponse:
         return ContextHttpResponse.deserialize(self, data)
 
-    def _load_session(self) -> Session | None:
-        """Load session from cache."""
-        if self.STATE_SESSION not in self.context.state:
-            return None
-        key = self.context.state.get(self.STATE_SESSION)
-        if key is None:
-            return None
-        try:
-            return self.context.cache.get(key, serialization_mode="pickle")
-        except Exception:
-            return None
+    def _get_session_key(self) -> str:
+        """Get deterministic session cache key for this crawler/run."""
+        return make_key(self.context.crawler.name, "session", self.context.run_id)
+
+    def _load_session(self) -> SessionModel | None:
+        """Load session from cache using pydantic model."""
+        # Use deterministic key based on crawler name and run_id
+        # This allows session to be shared across stages without passing state
+        key = self._get_session_key()
+        return self.context.cache.get(key, model=SessionModel)
 
     def save(self) -> None:
-        """Save session to cache and store key in state."""
-        key = make_key(self.context.crawler.name, "session", self.context.run_id)
-        self.context.cache.put(key, self.session, serialization_mode="pickle")
-        self.context.state[self.STATE_SESSION] = key
+        """Save session to cache using pydantic model."""
+        key = self._get_session_key()
+        session_state = SessionModel.from_client(self.client)
+        self.context.cache.put(key, session_state, model=SessionModel)
 
 
 class ContextHttpResponse:
     """Handle a cached and managed HTTP response.
 
-    This is a wrapper for ``requests`` HTTP response which adds several
+    This is a wrapper for ``httpx`` HTTP response which adds several
     aspects:
 
     * Uses HTTP caching against the archive when configured to do so.
@@ -128,20 +159,22 @@ class ContextHttpResponse:
     def __init__(
         self,
         http: ContextHttp,
-        request: Request | None = None,
-        allow_redirects: bool = True,
+        request: httpx.Request | None = None,
+        auth: tuple[str, str] | None = None,
+        follow_redirects: bool = True,
         timeout: float | None = None,
     ) -> None:
         self.http = http
         self.context = http.context
         self.request = request
-        self.allow_redirects = allow_redirects
+        self.auth = auth
+        self.follow_redirects = follow_redirects
         self.timeout = timeout
-        self._response = None
+        self._response: httpx.Response | None = None
         self._status_code: int | None = None
         self._url: str | None = None
         self._request_id: str | None = None
-        self._headers: CaseInsensitiveDict | None = None
+        self._headers: httpx.Headers | None = None
         self._encoding: str | None = None
         self._content_hash: str | None = None
         self.retrieved_at: str | None = None
@@ -156,37 +189,49 @@ class ContextHttpResponse:
         return True
 
     @property
-    def response(self):
-        """Get the underlying requests Response, triggering the HTTP request if needed."""
+    def response(self) -> httpx.Response | None:
+        """Get the underlying httpx Response, triggering the HTTP request if needed."""
         if self._response is None and self.request is not None:
             request = self.request
             existing = None
             if self.use_cache and self.request_id:
                 existing = self.context.get_tag(self.request_id)
+
+            # Build headers for conditional request
+            extra_headers: dict[str, str] = {}
             if existing is not None:
-                headers = CaseInsensitiveDict(existing.get("headers"))
+                headers = existing.get("headers", {})
                 last_modified = headers.get("last-modified")
                 if last_modified:
-                    request.headers["If-Modified-Since"] = last_modified
+                    extra_headers["If-Modified-Since"] = last_modified
 
                 etag = headers.get("etag")
                 if etag:
-                    request.headers["If-None-Match"] = etag
+                    extra_headers["If-None-Match"] = etag
 
-            self._rate_limit(request.url)
+            self._rate_limit(str(request.url))
 
-            session = self.http.session
-            prepared = session.prepare_request(request)
-            response = session.send(
-                prepared,
+            # Merge extra headers with request headers for conditional requests
+            # and keeping auth headers intact
+            merged_headers = dict(request.headers)
+            merged_headers.update(extra_headers)
+            request = self.http.client.build_request(
+                request.method,
+                request.url,
+                headers=merged_headers,
+                content=request.content,
+            )
+
+            response = self.http.client.send(
+                request,
                 stream=True,
-                verify=False,
-                timeout=self.timeout,
-                allow_redirects=self.allow_redirects,
+                auth=self.auth,
+                follow_redirects=self.follow_redirects,
             )
 
             if existing is not None and response.status_code == 304:
                 self.context.log.info("Using cached HTTP response: %s", response.url)
+                response.close()
                 self.apply_data(existing)
             else:
                 self._response = response
@@ -206,7 +251,7 @@ class ContextHttpResponse:
         # Stream response, computing hash and collecting chunks
         content_hash = sha1()
         chunks: list[bytes] = []
-        for chunk in self.response.iter_content(chunk_size=8192):
+        for chunk in self.response.iter_bytes(chunk_size=8192):
             content_hash.update(chunk)
             chunks.append(chunk)
 
@@ -232,10 +277,9 @@ class ContextHttpResponse:
     @property
     def url(self) -> str | None:
         if self._response is not None:
-            return self._response.url
+            return str(self._response.url)  # httpx.URL -> str
         if self.request is not None:
-            session = self.http.session
-            return session.prepare_request(self.request).url
+            return str(self.request.url)
         return self._url
 
     @property
@@ -243,15 +287,13 @@ class ContextHttpResponse:
         if self._request_id is not None:
             return self._request_id
         if self.request is not None:
-            url_parts = urlsplit(self.url)
-            parts = [self.request.method, *url_parts[1:3]]
-            params = url_parts[3]
-            if params:
-                parts.append(hash_data(params))
-            if self.request.data:
-                parts.append(hash_data(self.request.data))
-            if self.request.json:
-                parts.append(hash_data(self.request.json))
+            url = str(self.request.url)
+            url_parts = urlsplit(url)
+            parts = [self.request.method, url_parts.netloc, url_parts.path]
+            if url_parts.query:
+                parts.append(hash_data(url_parts.query))
+            if self.request.content:
+                parts.append(hash_data(self.request.content))
             return join_relpaths(*parts)
         return None
 
@@ -262,10 +304,11 @@ class ContextHttpResponse:
         return self._status_code
 
     @property
-    def headers(self) -> CaseInsensitiveDict:
+    def headers(self) -> httpx.Headers:
+        """Get response headers (httpx.Headers is already case-insensitive)."""
         if self._headers is None and self.response:
             self._headers = self.response.headers
-        return self._headers or CaseInsensitiveDict()
+        return self._headers or httpx.Headers()
 
     @property
     def last_modified(self) -> str | None:
@@ -344,7 +387,7 @@ class ContextHttpResponse:
     def html(self):
         """Parse HTML content."""
         if self.content_hash is None:
-            return
+            return None
         if self.content_type in NON_HTML:
             return None
         text = self.text
@@ -416,7 +459,7 @@ class ContextHttpResponse:
         self._status_code = data.get("status_code")
         self._url = data.get("url")
         self._request_id = data.get("request_id")
-        self._headers = CaseInsensitiveDict(data.get("headers"))
+        self._headers = httpx.Headers(data.get("headers", {}))
         self._encoding = data.get("encoding")
         self._content_hash = data.get("content_hash")
         self.retrieved_at = data.get("retrieved_at")

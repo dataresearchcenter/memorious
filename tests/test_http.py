@@ -1,17 +1,97 @@
+import httpx
 from lxml import etree, html
-from requests import Request, Response, Session
 
 from memorious.logic.http import ContextHttpResponse
+from memorious.model.session import SessionModel
+
+
+class TestSessionModel:
+    def test_session_model_serialization(self):
+        """Test SessionModel can serialize and deserialize."""
+        model = SessionModel(
+            cookies={"session_id": "abc123"},
+            headers={"X-Custom": "value"},
+            auth_header="Basic dXNlcjpwYXNzd29yZA==",
+        )
+        # Serialize to dict
+        data = model.model_dump()
+        assert data["cookies"] == {"session_id": "abc123"}
+        assert data["headers"] == {"X-Custom": "value"}
+        assert data["auth_header"] == "Basic dXNlcjpwYXNzd29yZA=="
+
+        # Deserialize from dict
+        restored = SessionModel.model_validate(data)
+        assert restored.cookies == {"session_id": "abc123"}
+        assert restored.headers == {"X-Custom": "value"}
+        assert restored.auth_header == "Basic dXNlcjpwYXNzd29yZA=="
+
+    def test_session_model_from_client(self):
+        """Test extracting session state from httpx.Client."""
+        client = httpx.Client()
+        client.cookies.set("test_cookie", "cookie_value")
+        client.headers["X-Test-Header"] = "header_value"
+        client.auth = ("testuser", "testpass")
+
+        model = SessionModel.from_client(client)
+        assert model.cookies.get("test_cookie") == "cookie_value"
+        assert model.headers.get("x-test-header") == "header_value"
+        assert model.auth_header is not None
+        assert model.auth_header.startswith("Basic ")
+
+        client.close()
+
+    def test_session_model_apply_to_client(self):
+        """Test applying session state to httpx.Client."""
+        model = SessionModel(
+            cookies={"restored_cookie": "restored_value"},
+            headers={"X-Restored": "restored_header"},
+            auth_header="Basic dXNlcjpwYXNzd29yZA==",
+        )
+
+        client = httpx.Client()
+        model.apply_to_client(client)
+
+        assert client.cookies.get("restored_cookie") == "restored_value"
+        assert client.headers.get("X-Restored") == "restored_header"
+        assert client.headers.get("Authorization") == "Basic dXNlcjpwYXNzd29yZA=="
+
+        client.close()
+
+    def test_session_model_roundtrip(self):
+        """Test full roundtrip: client -> model -> dict -> model -> client."""
+        # Create client with state
+        client1 = httpx.Client()
+        client1.cookies.set("roundtrip", "test")
+        client1.headers["X-Roundtrip"] = "header"
+        client1.auth = ("round", "trip")
+
+        # Extract to model, serialize to dict
+        model1 = SessionModel.from_client(client1)
+        data = model1.model_dump()
+
+        # Deserialize and apply to new client
+        model2 = SessionModel.model_validate(data)
+        client2 = httpx.Client()
+        model2.apply_to_client(client2)
+
+        # Verify state was preserved
+        assert client2.cookies.get("roundtrip") == "test"
+        assert client2.headers.get("X-Roundtrip") == "header"
+        # Auth is now stored as Authorization header
+        assert client2.headers.get("Authorization") == model1.auth_header
+
+        client1.close()
+        client2.close()
 
 
 class TestContextHttp:
-    def test_session(self, http):
-        assert isinstance(http.session, Session)
+    def test_client(self, http):
+        assert isinstance(http.client, httpx.Client)
 
     def test_response(self, http, httpbin_url):
         response = http.get(f"{httpbin_url}/get")
         assert isinstance(response, ContextHttpResponse)
-        assert isinstance(response._response, Response)
+        assert isinstance(response._response, httpx.Response)
 
     def test_response_lazy(self, http, httpbin_url):
         response = http.get(f"{httpbin_url}/get", lazy=True)
@@ -21,7 +101,7 @@ class TestContextHttp:
 
 class TestContextHttpResponse:
     def test_fetch_response(self, http, httpbin_url):
-        request = Request("GET", f"{httpbin_url}/get")
+        request = httpx.Request("GET", f"{httpbin_url}/get")
         context_http_response = ContextHttpResponse(http, request)
         content_hash = context_http_response.fetch()
         # fetch() now returns content_hash, not file_path
@@ -29,12 +109,12 @@ class TestContextHttpResponse:
         assert len(content_hash) == 40  # SHA1 hex digest length
 
     def test_contenttype(self, http, httpbin_url):
-        request = Request("GET", f"{httpbin_url}/get")
+        request = httpx.Request("GET", f"{httpbin_url}/get")
         context_http_response = ContextHttpResponse(http, request)
         assert context_http_response.content_type == "application/json"
 
     def test_attachment(self, http, httpbin_url):
-        request = Request(
+        request = httpx.Request(
             "GET",
             f"{httpbin_url}/response-headers?Content-Type="
             "text/plain;%20charset=UTF-8&Content-Disposition=attachment;"
@@ -44,12 +124,12 @@ class TestContextHttpResponse:
         assert context_http_response.file_name == "test.json"
 
     def test_encoding_default(self, http, httpbin_url):
-        request = Request("GET", f"{httpbin_url}/response-headers?charset=")
+        request = httpx.Request("GET", f"{httpbin_url}/response-headers?charset=")
         context_http_response = ContextHttpResponse(http, request)
         assert context_http_response.encoding == "utf-8"
 
     def test_encoding_utf16(self, http, httpbin_url):
-        request = Request(
+        request = httpx.Request(
             "GET",
             f"{httpbin_url}/response-headers?content-type=text"
             "/plain;%20charset=utf-16",
@@ -58,7 +138,7 @@ class TestContextHttpResponse:
         assert context_http_response.encoding == "utf-16"
 
     def test_encoding_utf32(self, http, httpbin_url):
-        request = Request(
+        request = httpx.Request(
             "GET",
             f"{httpbin_url}/response-headers?Content-Type=text/"
             "plain;%20charset=utf-32",
@@ -67,13 +147,16 @@ class TestContextHttpResponse:
         assert context_http_response.encoding == "utf-32"
 
     def test_request_id(self, http, httpbin_url):
-        request = Request("GET", f"{httpbin_url}/get", data={"hello": "world"})
+        # httpx.Request with data needs to be passed as content
+        request = httpx.Request(
+            "GET", f"{httpbin_url}/get", content=b'{"hello": "world"}'
+        )
         context_http_response = ContextHttpResponse(http, request)
         assert context_http_response._request_id is None
         assert isinstance(context_http_response.request_id, str)
 
     def test_content(self, http, httpbin_url):
-        request = Request(
+        request = httpx.Request(
             "GET",
             f"{httpbin_url}/user-agent",
             headers={"User-Agent": "Memorious Test"},
@@ -84,12 +167,12 @@ class TestContextHttpResponse:
         assert context_http_response.json == {"user-agent": "Memorious Test"}
 
     def test_html(self, http, httpbin_url):
-        request = Request("GET", f"{httpbin_url}/html")
+        request = httpx.Request("GET", f"{httpbin_url}/html")
         context_http_response = ContextHttpResponse(http, request)
         assert isinstance(context_http_response.html, html.HtmlElement)
 
     def test_xml(self, http, httpbin_url):
-        request = Request("GET", f"{httpbin_url}/xml")
+        request = httpx.Request("GET", f"{httpbin_url}/xml")
         context_http_response = ContextHttpResponse(http, request)
         assert isinstance(context_http_response.xml, etree._ElementTree)
 
@@ -111,7 +194,7 @@ class TestContextHttpResponse:
         assert context_http_response.status_code == 200
 
     def test_close(self, http, httpbin_url):
-        request = Request("GET", f"{httpbin_url}/get")
+        request = httpx.Request("GET", f"{httpbin_url}/get")
         context_http_response = ContextHttpResponse(http, request)
         content_hash = context_http_response.fetch()
         # fetch() now returns content_hash, not file_path
@@ -120,16 +203,16 @@ class TestContextHttpResponse:
         # Content remains in archive after close
 
     def test_status_code_404(self, http, httpbin_url):
-        request = Request("GET", f"{httpbin_url}/status/404")
+        request = httpx.Request("GET", f"{httpbin_url}/status/404")
         context_http_response = ContextHttpResponse(http, request)
         assert context_http_response.status_code == 404
 
     def test_status_code_500(self, http, httpbin_url):
-        request = Request("GET", f"{httpbin_url}/status/500")
+        request = httpx.Request("GET", f"{httpbin_url}/status/500")
         context_http_response = ContextHttpResponse(http, request)
         assert context_http_response.status_code == 500
 
     def test_status_code_200(self, http, httpbin_url):
-        request = Request("GET", f"{httpbin_url}/status/200")
+        request = httpx.Request("GET", f"{httpbin_url}/status/200")
         context_http_response = ContextHttpResponse(http, request)
         assert context_http_response.status_code == 200

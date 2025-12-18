@@ -1,6 +1,6 @@
 from urllib.parse import urlparse
 
-from requests.exceptions import RequestException
+import httpx
 from servicelayer.cache import make_key
 
 from memorious.helpers.rule import Rule
@@ -10,14 +10,14 @@ def fetch(context, data):
     """Do an HTTP GET on the ``url`` specified in the inbound data."""
     url = data.get("url")
     if urlparse(url).scheme not in ("http", "https", ""):
-        context.log.info("Fetch skipped. Unsupported scheme: %r", url)
+        context.log.info("Fetch skipped. Unsupported scheme: %r" % url)
         return
     attempt = data.pop("retry_attempt", 1)
     try:
         result = context.http.get(url, lazy=True)
         rules = context.get("rules", {"match_all": {}})
         if not Rule.get_rule(rules).apply(result):
-            context.log.info("Fetch skip: %r", result.url)
+            context.log.info("Fetch skip: %r" % result.url)
             return
 
         if not result.ok:
@@ -26,14 +26,14 @@ def fetch(context, data):
             if not context.params.get("emit_errors", False):
                 return
         else:
-            context.log.info("Fetched [%s]: %r", result.status_code, result.url)
+            context.log.info("Fetched [%s]: %r" % (result.status_code, result.url))
 
         data.update(result.serialize())
         if url != result.url:
             tag = make_key(context.run_id, url)
             context.set_tag(tag, None)
         context.emit(data=data)
-    except RequestException as ce:
+    except httpx.HTTPError as ce:
         retries = int(context.get("retry", 3))
         if retries >= attempt:
             context.log.warn("Retry: %s (error: %s)", url, ce)
@@ -55,20 +55,23 @@ def session(context, data):
     password = context.get("password")
 
     if user is not None and password is not None:
-        context.http.session.auth = (user, password)
+        context.http.client.auth = (user, password)
 
     user_agent = context.get("user_agent")
     if user_agent is not None:
-        context.http.session.headers["User-Agent"] = user_agent
+        context.http.client.headers["User-Agent"] = user_agent
 
     referer = context.get("url")
     if referer is not None:
-        context.http.session.headers["Referer"] = referer
+        context.http.client.headers["Referer"] = referer
 
     proxy = context.get("proxy")
     if proxy is not None:
-        proxies = {"http": proxy, "https": proxy}
-        context.http.session.proxies = proxies
+        # httpx uses different proxy format
+        context.http.client._mounts = {
+            "http://": httpx.HTTPTransport(proxy=proxy),
+            "https://": httpx.HTTPTransport(proxy=proxy),
+        }
 
     # Explicitly save the session because no actual HTTP requests were made.
     context.http.save()

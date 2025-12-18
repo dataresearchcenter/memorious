@@ -3,9 +3,9 @@ import mimetypes
 import os
 import shutil
 
+import httpx
 from ftm_lakehouse import get_lakehouse
 from normality import safe_filename
-from requests.structures import CaseInsensitiveDict
 from rigour.mime import normalize_mimetype
 
 
@@ -50,9 +50,9 @@ def directory(context, data):
 
         path = _get_directory_path(context)
         file_name = data.get("file_name", result.file_name)
-        mime_type = normalize_mimetype(
-            CaseInsensitiveDict(data.get("headers", {})).get("content-type")
-        )
+        # httpx.Headers is case-insensitive
+        headers = httpx.Headers(data.get("headers", {}))
+        mime_type = normalize_mimetype(headers.get("content-type"))
         extension = _get_file_extension(file_name, mime_type)
         file_name = file_name or "data"
         file_name = safe_filename(file_name, extension=extension)
@@ -85,9 +85,9 @@ def lakehouse(context, data):
             return
 
         file_name = data.get("file_name", result.file_name)
-        mime_type = normalize_mimetype(
-            CaseInsensitiveDict(data.get("headers", {})).get("content-type")
-        )
+        # httpx.Headers is case-insensitive
+        headers = httpx.Headers(data.get("headers", {}))
+        mime_type = normalize_mimetype(headers.get("content-type"))
         extension = _get_file_extension(file_name, mime_type)
         file_name = file_name or "data"
         file_name = safe_filename(file_name, extension=extension)
@@ -110,7 +110,7 @@ def lakehouse(context, data):
                 source_url=data.get("url"),
             )
 
-        context.log.info("Store [lakehouse]: %s (%s)", file_name, file_info.checksum)
+        context.log.info("Store [lakehouse]: %s (%s)" % (file_name, file_info.checksum))
         context.emit(data=data)
 
 

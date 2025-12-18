@@ -41,6 +41,13 @@ def get_tags(dataset: str) -> Tags:
     return Tags(store)
 
 
+@cache
+def get_cache():
+    """Get cached store instance for runtime cache (sessions, etc.)."""
+    settings = get_settings()
+    return get_store(settings.cache_uri, raise_on_nonexist=False)
+
+
 conn = LocalProxy(get_conn)
 settings = LocalProxy(get_settings)
 

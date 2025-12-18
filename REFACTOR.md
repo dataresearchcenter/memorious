@@ -24,22 +24,24 @@ memorious/
 └── helpers/             # Utility functions
 ```
 
-### Target Architecture
+### Target Architecture (CURRENT STATE)
 ```
 memorious/
-├── settings.py          # Pydantic Settings class
+├── settings.py          # ✅ Pydantic Settings class
+├── core.py              # ✅ @weakref_cache getters (get_settings, get_conn, get_tags)
 ├── model/
-│   ├── crawler.py       # CrawlerConfig(ftmq.model.Dataset) pydantic model
-│   └── stage.py         # StageConfig pydantic model
-├── tasks.py             # Single procrastinate task definition (uses DatasetJob directly)
+│   ├── crawler.py       # ✅ CrawlerConfig(ftmq.model.Dataset) + AggregatorConfig
+│   ├── stage.py         # ✅ StageConfig pydantic model + CrawlerStage runtime wrapper
+│   └── session.py       # ✅ SessionModel for httpx session persistence
+├── tasks.py             # ✅ execute_stage task + defer_stage helper (uses DatasetJob)
 ├── logic/
-│   ├── context.py       # Execution context (with Tags/Archive initialized directly)
-│   ├── crawler.py       # Crawler orchestration
-│   ├── http.py          # HTTP client with caching
-│   └── operations.py    # Operation registry/resolution
-├── operations/          # Built-in stage methods (unchanged)
+│   ├── context.py       # ✅ Context with @cached_property (tags, archive, settings)
+│   ├── crawler.py       # ✅ Crawler wrapper class with @cached_property
+│   ├── manager.py       # ✅ CrawlerManager for loading YAML configs
+│   └── http.py          # ✅ httpx-based HTTP client with SessionModel persistence
+├── operations/          # ✅ Built-in stage methods (updated for httpx)
 ├── helpers/             # Utility functions (unchanged)
-└── cli.py               # Click CLI (adapted for procrastinate)
+└── cli.py               # Click CLI (Phase 7 will migrate to Typer)
 ```
 
 ---
@@ -1280,34 +1282,39 @@ def show_settings():
 - [x] Update Crawler.cancel() to use cancel_jobs(dataset=self.name)
 - [x] Update tests (removed test_reporting.py)
 
-### Phase 4: Tags Migration
-- [ ] Update Context to initialize anystore.Tags directly
-- [ ] Update tag method calls: `set()` → `put()`
-- [ ] Remove servicelayer.tags usage
-- [ ] Update tests
+### Phase 4: Tags Migration ✅ COMPLETE
+- [x] Update Context to initialize anystore.Tags directly
+- [x] Update tag method calls: `set()` → `put()`
+- [x] Remove servicelayer.tags usage (using anystore.Tags via core.get_tags())
+- [x] Update tests
 
-### Phase 5: Archive Migration
-- [ ] Update Context to initialize ftm_lakehouse archive directly
-- [ ] Update Context.store_file() and Context.load_file()
-- [ ] Update ContextHttpResponse
-- [ ] Remove servicelayer.archive usage
-- [ ] Update tests
+### Phase 5: Archive Migration ✅ COMPLETE
+- [x] Update Context to initialize ftm_lakehouse archive directly
+- [x] Update Context.store_file() and Context.store_data()
+- [x] Add Context.open() and Context.local_path() for reading from archive
+- [x] Update ContextHttpResponse to use context.archive
+- [x] Remove servicelayer.archive usage
+- [x] Update tests
+- [x] Add lakehouse() operation with custom URI support
 
-### Phase 6: Additional Refactoring
+### Phase 6: Additional Refactoring ✅ PARTIAL
 - [ ] Reorganize package structure
 - [ ] Create operations registry
 - [ ] Convert rules to pydantic
-- [ ] Migrate HTTP client to httpx (see 6.2)
-  - [ ] Add `httpx` dependency
-  - [ ] Create `memorious/model/session.py` with `SessionModel`
-  - [ ] Refactor `ContextHttp` to use `httpx.Client`
-  - [ ] Refactor `ContextHttpResponse` for httpx API
-  - [ ] Update session persistence to use `model=SessionModel`
-  - [ ] Remove `requests` dependency (after verifying no other usages)
-- [ ] Update tests
+- [x] Migrate HTTP client to httpx (see 6.2)
+  - [x] Add `httpx` dependency
+  - [x] Create `memorious/model/session.py` with `SessionModel`
+  - [x] Refactor `ContextHttp` to use `httpx.Client` with lazy `@property`
+  - [x] Refactor `ContextHttpResponse` for httpx API
+  - [x] Update session persistence to use `model=SessionModel`
+  - [x] Move `requests` to optional `[ftp]` dependency (needed for requests-ftp)
+  - [x] Update `operations/fetch.py` and `operations/parse.py` to use `context.http.client`
+  - [x] Update `operations/store.py` to use `httpx.Headers` instead of `CaseInsensitiveDict`
+  - [x] Update all tests
+- [ ] Update tests for other changes
 
 ### Phase 7: CLI & Documentation
-- [ ] Update CLI commands
+- [ ] Migrate CLI from Click to Typer
 - [ ] Update CLAUDE.md
 - [ ] Update README
 - [ ] Update documentation
@@ -1316,14 +1323,25 @@ def show_settings():
 
 ## Dependency Changes
 
-### Remove
-```toml
-# Remove from dependencies
-# servicelayer (most functionality replaced)
-# requests (replaced by httpx)
-```
+### Current Status
 
-### Add/Update
+**Removed from core dependencies:**
+- `requests` - moved to optional `[ftp]` dependency (needed for requests-ftp)
+
+**Added:**
+- `httpx` - modern HTTP client replacing requests
+- `openaleph-procrastinate` - task queue
+- `ftm-lakehouse` - archive storage
+- `anystore` - tags and cache storage
+- `ftmq` - FTM data models (Dataset inheritance)
+
+**Still needed (to be removed later):**
+- `openaleph-servicelayer` - still used for:
+  - `servicelayer.cache.make_key` (can be replaced with anystore.util)
+  - `servicelayer.cache.RateLimit` (needs alternative)
+  - `servicelayer.extensions.get_entry_point` (for operation resolution)
+
+### Target
 ```toml
 [project.dependencies]
 # Core
@@ -1339,15 +1357,18 @@ ftm-lakehouse = ">=0.1"
 ftmq = ">=4.0"
 
 # HTTP client
-httpx = ">=0.27"  # replaces requests
+httpx = ">=0.28"  # replaces requests for core HTTP
 
-# CLI and utilities
+# CLI and utilities (Phase 7)
 typer = ">=0.9"
 rich = ">=13.0"
 
 # Keep existing
 lxml = ">=5.0"
 pyyaml = ">=6.0"
+
+[project.optional-dependencies]
+ftp = ["requests[security]", "PySocks", "requests-ftp"]  # FTP support requires requests
 ```
 
 ---

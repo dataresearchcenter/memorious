@@ -322,12 +322,10 @@ name = "anystore"
 version = "0.4.1"
 description = "Store and cache things anywhere"
 optional = false
-python-versions = "<4,>=3.11"
+python-versions = ">=3.11,<4"
 groups = ["main"]
-files = [
-    {file = "anystore-0.4.1-py3-none-any.whl", hash = "sha256:de660ccb59738fbae080d68ec3a92e9edc5264af350f54bdbda83c7c7a5b2cb0"},
-    {file = "anystore-0.4.1.tar.gz", hash = "sha256:c7b196042b7e74bd9a6ca6df1068e7d1b8752c84d91df73b0f6dfd831cfdcf62"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 banal = ">=1.0.6,<2.0.0"
@@ -350,6 +348,12 @@ uuid7 = ">=0.1.0,<0.2.0"
 [package.extras]
 redis = ["fakeredis (>=2.26.2,<3.0.0)", "redis (>=4.0.0)"]
 sql = ["sqlalchemy (>=2.0.36,<3.0.0)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/dataresearchcenter/anystore.git"
+reference = "HEAD"
+resolved_reference = "fe5ca1c438262da2b8d7755561e0daee2f65bd07"
 
 [[package]]
 name = "arro3-core"
@@ -1691,12 +1695,10 @@ name = "ftm-lakehouse"
 version = "0.1.1"
 description = "Data standard, storage and retrieval for structured and unstructured FollowTheMoney data"
 optional = false
-python-versions = "<4,>=3.11"
+python-versions = ">=3.11,<4"
 groups = ["main"]
-files = [
-    {file = "ftm_lakehouse-0.1.1-py3-none-any.whl", hash = "sha256:7306c558dd8a88616b1ceb0c4147bbf04a1a431e7bb1c1980a413c8b6c403bff"},
-    {file = "ftm_lakehouse-0.1.1.tar.gz", hash = "sha256:94e7321c6f031826a4787f5fd067ef94bbd1ef949f0a9be072f7241c59b767cb"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 followthemoney = ">=4.3.4,<5.0.0"
@@ -1706,6 +1708,12 @@ jinja2 = ">=3.1.5,<4.0.0"
 [package.extras]
 api = ["fastapi (>=0.115.6,<0.116.0)", "pyjwt (>=2.10.1,<3.0.0)", "uvicorn (>=0.34.0,<0.35.0)"]
 openaleph = ["openaleph-procrastinate (>=5.1.2,<6.0.0)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/openaleph/ftm-lakehouse.git"
+reference = "HEAD"
+resolved_reference = "91d9407b5f755e153e1785ecabee50ed39fc27ae"
 
 [[package]]
 name = "ftmq"
@@ -4671,9 +4679,10 @@ diagrams = ["jinja2", "railroad-diagrams"]
 name = "pysocks"
 version = "1.7.1"
 description = "A Python SOCKS client module. See https://github.com/Anorov/PySocks for more information."
-optional = false
+optional = true
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 groups = ["main"]
+markers = "extra == \"ftp\""
 files = [
     {file = "PySocks-1.7.1-py27-none-any.whl", hash = "sha256:08e69f092cc6dbe92a0fdd16eeb9b9ffbc13cadfe5ca4c7bd92ffb078b293299"},
     {file = "PySocks-1.7.1-py3-none-any.whl", hash = "sha256:2725bd0a9925919b9b51739eea5f9e2bae91e83288108a9ad338b2e3a4435ee5"},
@@ -5262,9 +5271,10 @@ requests = ">=1.0.0"
 name = "requests-ftp"
 version = "0.3.1"
 description = "FTP Transport Adapter for Requests."
-optional = false
+optional = true
 python-versions = "*"
 groups = ["main"]
+markers = "extra == \"ftp\""
 files = [
     {file = "requests-ftp-0.3.1.tar.gz", hash = "sha256:7504ceb5cba8a5c0135ed738596820a78c5f2be92d79b29f96ba99b183d8057a"},
 ]
@@ -6604,6 +6614,7 @@ multidict = ">=4.0"
 propcache = ">=0.2.1"
 
 [extras]
+ftp = ["PySocks", "requests", "requests-ftp"]
 postgres = ["psycopg2", "sqlalchemy"]
 redis = ["fakeredis", "redis"]
 sql = ["sqlalchemy"]
@@ -6611,4 +6622,4 @@ sql = ["sqlalchemy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4"
-content-hash = "2cc1acd4eec00c4797e86b42d07eb1dd1c357e7092328967dbc31f353244dc09"
+content-hash = "04660a368c337d214183e7004e8e43dfe2d0a925fc98858a1fd270fb34d1e4e2"

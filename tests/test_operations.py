@@ -46,9 +46,10 @@ def test_session(context, mocker, httpbin_url):
 
     assert context.http.save.called_one_with()
     assert context.emit.called_one_with(data=data)
-    assert context.http.session.headers["User-Agent"] == "Godzilla Firehose 0.1"
-    assert context.http.session.headers["Referer"] == f"{httpbin_url}/get"
-    assert context.http.session.auth == ("user", "password")
+    assert context.http.client.headers["User-Agent"] == "Godzilla Firehose 0.1"
+    assert context.http.client.headers["Referer"] == f"{httpbin_url}/get"
+    # httpx uses BasicAuth object instead of tuple
+    assert context.http.client.auth is not None
 
 
 def test_parse(context, mocker, httpbin_url):
