@@ -744,9 +744,199 @@ memorious/
 
 Note: Tags (`anystore.Tags`) and Archive (`ftm_lakehouse.DatasetArchive`) are initialized directly in `Context.__init__()` rather than through separate service modules, as they require no additional abstraction.
 
-### 6.2 HTTP Client
+### 6.2 HTTP Client Migration to httpx
 
-The HTTP client remains in `memorious/logic/http.py` as `ContextHttp`. It receives the Context instance and uses its `_tags` and `_archive` directly for caching. No separate service module needed.
+Replace `requests` with `httpx` for modern async-capable HTTP client with HTTP/2 support.
+
+#### API Mapping
+
+| requests | httpx |
+|----------|-------|
+| `Session()` | `Client()` |
+| `session.prepare_request(req)` | Not needed |
+| `session.send(prepared, stream=True)` | `client.send(request, stream=True)` |
+| `response.iter_content(chunk_size)` | `response.iter_bytes(chunk_size)` |
+| `Request(method, url, ...)` | `httpx.Request(method, url, ...)` |
+| `CaseInsensitiveDict` | Not needed (httpx headers are case-insensitive) |
+
+#### Session Persistence with Pydantic Model
+
+Create `memorious/model/session.py`:
+```python
+"""HTTP session state model for serialization."""
+from typing import Any
+
+from pydantic import BaseModel
+
+
+class SessionModel(BaseModel):
+    """Serializable HTTP session state."""
+
+    cookies: dict[str, str] = {}
+    headers: dict[str, str] = {}
+    auth: tuple[str, str] | None = None
+
+    @classmethod
+    def from_client(cls, client: "httpx.Client") -> "SessionModel":
+        """Extract session state from httpx Client."""
+        return cls(
+            cookies=dict(client.cookies),
+            headers=dict(client.headers),
+            # auth stored separately if set
+        )
+
+    def apply_to_client(self, client: "httpx.Client") -> None:
+        """Apply session state to httpx Client."""
+        client.cookies.update(self.cookies)
+        client.headers.update(self.headers)
+```
+
+#### Updated ContextHttp Class
+
+```python
+import httpx
+from memorious.model.session import SessionModel
+
+class ContextHttp:
+    STATE_SESSION = "_http"
+
+    def __init__(self, context: Context) -> None:
+        self.context = context
+        self.cache = settings.http_cache
+        if "cache" in context.params:
+            self.cache = context.params.get("cache")
+
+        self._client: httpx.Client | None = None
+        self._session_state: SessionModel | None = self._load_session()
+
+    @property
+    def client(self) -> httpx.Client:
+        if self._client is None:
+            self._client = httpx.Client(
+                verify=False,
+                follow_redirects=True,
+                timeout=settings.http_timeout,
+            )
+            self._client.headers["User-Agent"] = settings.user_agent
+            if self.context.crawler.stealthy:
+                self._client.headers["User-Agent"] = UserAgent().random()
+
+            # Apply saved session state
+            if self._session_state:
+                self._session_state.apply_to_client(self._client)
+
+        return self._client
+
+    def reset(self) -> httpx.Client:
+        if self._client:
+            self._client.close()
+        self._client = None
+        self._session_state = None
+        return self.client
+
+    def _load_session(self) -> SessionModel | None:
+        """Load session from cache using pydantic model."""
+        if self.STATE_SESSION not in self.context.state:
+            return None
+        key = self.context.state.get(self.STATE_SESSION)
+        if key is None:
+            return None
+        try:
+            return self.context.cache.get(key, model=SessionModel)
+        except Exception:
+            return None
+
+    def save(self) -> None:
+        """Save session to cache using pydantic model."""
+        key = make_key(
+            self.context.crawler.name, "session", self.context.run_id
+        )
+        session_state = SessionModel.from_client(self.client)
+        self.context.cache.put(key, session_state, model=SessionModel)
+        self.context.state[self.STATE_SESSION] = key
+```
+
+#### Updated ContextHttpResponse
+
+Key changes:
+- Use `httpx.Request` instead of `requests.Request`
+- Use `client.send(request, stream=True)` instead of `session.send(prepared, ...)`
+- Use `response.iter_bytes()` instead of `response.iter_content()`
+- Use `str(response.url)` since httpx returns `httpx.URL` object
+- Remove `CaseInsensitiveDict` wrapper (httpx headers already case-insensitive)
+- Note: `auth` parameter goes on `Client` or `send()`, not `Request`
+
+```python
+class ContextHttpResponse:
+    def __init__(
+        self,
+        http: ContextHttp,
+        request: httpx.Request | None = None,
+        follow_redirects: bool = True,
+        timeout: float | None = None,
+    ) -> None:
+        self.http = http
+        self.context = http.context
+        self.request = request
+        self.follow_redirects = follow_redirects
+        self.timeout = timeout
+        # ... rest unchanged
+
+    @property
+    def response(self):
+        if self._response is None and self.request is not None:
+            # ... rate limiting and conditional request setup ...
+
+            self._response = self.http.client.send(
+                self.request,
+                stream=True,
+                follow_redirects=self.follow_redirects,
+            )
+
+            # ... rest of logic ...
+        return self._response
+
+    def fetch(self) -> str | None:
+        # ...
+        # Change iter_content to iter_bytes
+        for chunk in self.response.iter_bytes(chunk_size=8192):
+            content_hash.update(chunk)
+            chunks.append(chunk)
+        # ...
+
+    @property
+    def url(self) -> str | None:
+        if self._response is not None:
+            return str(self._response.url)  # httpx.URL -> str
+        # ...
+
+    @property
+    def headers(self) -> httpx.Headers:
+        # No CaseInsensitiveDict needed
+        if self._headers is None and self.response:
+            self._headers = self.response.headers
+        return self._headers or httpx.Headers()
+```
+
+#### Migration Steps
+
+1. Add `httpx` to dependencies in `pyproject.toml`
+2. Create `memorious/model/session.py` with `SessionModel`
+3. Update imports in `logic/http.py`:
+   - Remove: `from requests import Request, Session`
+   - Remove: `from requests.structures import CaseInsensitiveDict`
+   - Add: `import httpx`
+4. Refactor `ContextHttp`:
+   - `self.session: Session` → `self._client: httpx.Client | None`
+   - Add `@property client` with lazy initialization
+   - Update `_load_session()` / `save()` to use `SessionModel` with `model=` parameter
+5. Refactor `ContextHttpResponse`:
+   - Update request/response handling for httpx API
+   - `iter_content()` → `iter_bytes()`
+   - `response.url` → `str(response.url)`
+   - Remove `CaseInsensitiveDict` usage
+6. Update tests if any mock `requests` directly
+7. Remove `requests` from dependencies (check other usages first)
 
 ### 6.3 Operation Registry
 
@@ -1107,6 +1297,13 @@ def show_settings():
 - [ ] Reorganize package structure
 - [ ] Create operations registry
 - [ ] Convert rules to pydantic
+- [ ] Migrate HTTP client to httpx (see 6.2)
+  - [ ] Add `httpx` dependency
+  - [ ] Create `memorious/model/session.py` with `SessionModel`
+  - [ ] Refactor `ContextHttp` to use `httpx.Client`
+  - [ ] Refactor `ContextHttpResponse` for httpx API
+  - [ ] Update session persistence to use `model=SessionModel`
+  - [ ] Remove `requests` dependency (after verifying no other usages)
 - [ ] Update tests
 
 ### Phase 7: CLI & Documentation
@@ -1123,6 +1320,7 @@ def show_settings():
 ```toml
 # Remove from dependencies
 # servicelayer (most functionality replaced)
+# requests (replaced by httpx)
 ```
 
 ### Add/Update
@@ -1140,12 +1338,14 @@ anystore = ">=0.4"
 ftm-lakehouse = ">=0.1"
 ftmq = ">=4.0"
 
+# HTTP client
+httpx = ">=0.27"  # replaces requests
+
 # CLI and utilities
 typer = ">=0.9"
 rich = ">=13.0"
 
 # Keep existing
-requests = ">=2.0"
 lxml = ">=5.0"
 pyyaml = ">=6.0"
 ```

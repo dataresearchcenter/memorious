@@ -1,5 +1,3 @@
-import os
-
 from lxml import etree, html
 from requests import Request, Response, Session
 
@@ -25,8 +23,10 @@ class TestContextHttpResponse:
     def test_fetch_response(self, http, httpbin_url):
         request = Request("GET", f"{httpbin_url}/get")
         context_http_response = ContextHttpResponse(http, request)
-        file_path = context_http_response.fetch()
-        assert os.path.exists(file_path)
+        content_hash = context_http_response.fetch()
+        # fetch() now returns content_hash, not file_path
+        assert isinstance(content_hash, str)
+        assert len(content_hash) == 40  # SHA1 hex digest length
 
     def test_contenttype(self, http, httpbin_url):
         request = Request("GET", f"{httpbin_url}/get")
@@ -113,10 +113,11 @@ class TestContextHttpResponse:
     def test_close(self, http, httpbin_url):
         request = Request("GET", f"{httpbin_url}/get")
         context_http_response = ContextHttpResponse(http, request)
-        file_path = context_http_response.fetch()
-        assert os.path.exists(file_path)
+        content_hash = context_http_response.fetch()
+        # fetch() now returns content_hash, not file_path
+        assert isinstance(content_hash, str)
         context_http_response.close()
-        # assert not os.path.exists(file_path)
+        # Content remains in archive after close
 
     def test_status_code_404(self, http, httpbin_url):
         request = Request("GET", f"{httpbin_url}/status/404")

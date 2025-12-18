@@ -1,9 +1,10 @@
 import logging
 import os
 
+from anystore.functools import weakref_cache as cache
+from anystore.store import get_store
 from anystore.tags import Tags
-from anystore.tags import get_tags as _get_tags
-from servicelayer.archive import init_archive
+from ftm_lakehouse.lake.lakehouse import get_archive
 from servicelayer.cache import get_fakeredis, get_redis
 from servicelayer.extensions import get_extensions
 from servicelayer.logs import configure_logging
@@ -15,11 +16,10 @@ from memorious.settings import Settings
 log = logging.getLogger(__name__)
 
 
+@cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    settings = Settings()
-    settings.init_servicelayer()
-    return settings
+    return Settings()
 
 
 def get_conn():
@@ -30,26 +30,18 @@ def get_conn():
     return get_redis()
 
 
-def get_storage():
-    """Get cached archive storage."""
+@cache
+def get_tags(dataset: str) -> Tags:
     settings = get_settings()
-    return init_archive(path=str(settings.archive_path))
+    if settings.tags_uri:
+        store = get_store(settings.tags_uri)
+    else:
+        store = get_archive(dataset).get_cache("memorious")
+    store.raise_on_nonexist = False
+    return Tags(store)
 
 
-def get_tags() -> Tags:
-    """Get cached Tags instance."""
-    settings = get_settings()
-    # Ensure base_path exists for SQLite tags database
-    try:
-        os.makedirs(settings.base_path, exist_ok=True)
-    except Exception:
-        pass
-    return _get_tags(settings.resolved_tags_uri)
-
-
-tags = LocalProxy(get_tags)
 conn = LocalProxy(get_conn)
-storage = LocalProxy(get_storage)
 settings = LocalProxy(get_settings)
 
 

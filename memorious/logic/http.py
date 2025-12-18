@@ -1,12 +1,18 @@
+"""HTTP client with caching and lazy evaluation."""
+
+from __future__ import annotations
+
 import cgi
-import codecs
+import io
 import json
-import pickle
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from functools import cached_property
 from hashlib import sha1
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from typing import TYPE_CHECKING, Any, ContextManager
+from urllib.parse import unquote, urlparse, urlsplit
 
+from anystore.util import join_relpaths
 from banal import hash_data, is_mapping
 from lxml import etree, html
 from normality import guess_file_encoding, stringify
@@ -14,31 +20,34 @@ from requests import Request, Session
 from requests.structures import CaseInsensitiveDict
 from rigour.mime import normalize_mimetype, parse_mimetype
 from servicelayer.cache import make_key
-from servicelayer.settings import REDIS_SHORT
 
-from memorious.core import conn, get_rate_limit, get_storage, settings
+from memorious.core import get_rate_limit, settings
 from memorious.exc import ParseError
 from memorious.helpers.dates import parse_date
 from memorious.helpers.ua import UserAgent
 from memorious.logic.mime import NON_HTML
-from memorious.util import random_filename
+
+if TYPE_CHECKING:
+    from memorious.logic.context import Context
 
 
-class ContextHttp(object):
+class ContextHttp:
+    """HTTP client with session management and caching."""
+
     STATE_SESSION = "_http"
 
-    def __init__(self, context):
+    def __init__(self, context: "Context") -> None:
         self.context = context
 
         self.cache = settings.http_cache
         if "cache" in context.params:
             self.cache = context.params.get("cache")
 
-        self.session = self.load_session()
+        self.session = self._load_session()
         if self.session is None:
             self.reset()
 
-    def reset(self):
+    def reset(self) -> Session:
         self.session = Session()
         self.session.headers["User-Agent"] = settings.user_agent
         if self.context.crawler.stealthy:
@@ -47,17 +56,17 @@ class ContextHttp(object):
 
     def request(
         self,
-        method,
-        url,
-        headers=None,
-        auth=None,
-        data=None,
-        params=None,
-        json=None,
-        allow_redirects=True,
-        timeout=None,
-        lazy=False,
-    ):
+        method: str,
+        url: str,
+        headers: dict[str, str] | None = None,
+        auth: tuple[str, str] | None = None,
+        data: dict[str, Any] | None = None,
+        params: dict[str, Any] | list[tuple[str, Any]] | None = None,
+        json: dict[str, Any] | None = None,
+        allow_redirects: bool = True,
+        timeout: float | None = None,
+        lazy: bool = False,
+    ) -> ContextHttpResponse:
         if timeout is None:
             timeout = settings.http_timeout
         headers = headers or {}
@@ -75,66 +84,71 @@ class ContextHttp(object):
             response.fetch()
         return response
 
-    def get(self, url, **kwargs):
+    def get(self, url: str, **kwargs: Any) -> ContextHttpResponse:
         return self.request("GET", url, **kwargs)
 
-    def post(self, url, **kwargs):
+    def post(self, url: str, **kwargs: Any) -> ContextHttpResponse:
         return self.request("POST", url, **kwargs)
 
-    def rehash(self, data):
+    def rehash(self, data: dict[str, Any]) -> ContextHttpResponse:
         return ContextHttpResponse.deserialize(self, data)
 
-    def load_session(self):
+    def _load_session(self) -> Session | None:
+        """Load session from cache."""
         if self.STATE_SESSION not in self.context.state:
-            return
+            return None
         key = self.context.state.get(self.STATE_SESSION)
-        value = conn.get(key)
-        if value is not None:
-            session = codecs.decode(bytes(value, "utf-8"), "base64")
-            return pickle.loads(session)
+        if key is None:
+            return None
+        try:
+            return self.context.cache.get(key, serialization_mode="pickle")
+        except Exception:
+            return None
 
-    def save(self):
-        session = pickle.dumps(self.session)
-        session = codecs.encode(session, "base64")
-        key = sha1(session).hexdigest()[:15]
-        key = make_key(self.context.crawler, "session", self.context.run_id, key)
-        conn.set(key, session, ex=REDIS_SHORT)
+    def save(self) -> None:
+        """Save session to cache and store key in state."""
+        key = make_key(self.context.crawler.name, "session", self.context.run_id)
+        self.context.cache.put(key, self.session, serialization_mode="pickle")
         self.context.state[self.STATE_SESSION] = key
 
 
-class ContextHttpResponse(object):
+class ContextHttpResponse:
     """Handle a cached and managed HTTP response.
 
     This is a wrapper for ``requests`` HTTP response which adds several
     aspects:
 
-    * Uses HTTP caching against the database when configured to do so.
+    * Uses HTTP caching against the archive when configured to do so.
     * Will evaluate lazily in order to allow fast web crawling.
     * Allow responses to be serialized between crawler operations.
     """
 
     CACHE_METHODS = ["GET", "HEAD"]
 
-    def __init__(self, http, request=None, allow_redirects=True, timeout=None):
+    def __init__(
+        self,
+        http: ContextHttp,
+        request: Request | None = None,
+        allow_redirects: bool = True,
+        timeout: float | None = None,
+    ) -> None:
         self.http = http
         self.context = http.context
         self.request = request
         self.allow_redirects = allow_redirects
         self.timeout = timeout
         self._response = None
-        self._status_code = None
-        self._url = None
-        self._request_id = None
-        self._headers = None
-        self._encoding = None
-        self._content_hash = None
-        self._file_path = None
-        self.retrieved_at = None
-        self._remove_file = False
+        self._status_code: int | None = None
+        self._url: str | None = None
+        self._request_id: str | None = None
+        self._headers: CaseInsensitiveDict | None = None
+        self._encoding: str | None = None
+        self._content_hash: str | None = None
+        self.retrieved_at: str | None = None
 
     @property
-    def use_cache(self):
-        # It's complicated.
+    def use_cache(self) -> bool:
+        """Check if caching should be used for this request."""
         if not self.http.cache:
             return False
         if self.request is not None:
@@ -143,10 +157,11 @@ class ContextHttpResponse(object):
 
     @property
     def response(self):
+        """Get the underlying requests Response, triggering the HTTP request if needed."""
         if self._response is None and self.request is not None:
             request = self.request
             existing = None
-            if self.use_cache:
+            if self.use_cache and self.request_id:
                 existing = self.context.get_tag(self.request_id)
             if existing is not None:
                 headers = CaseInsensitiveDict(existing.get("headers"))
@@ -176,41 +191,38 @@ class ContextHttpResponse(object):
             else:
                 self._response = response
 
-            # update the serialised session with cookies etc.
+            # Update the serialized session with cookies etc.
             self.http.save()
         return self._response
 
-    def fetch(self):
-        """Lazily trigger download of the data when requested."""
-        if self._file_path is not None:
-            return self._file_path
-        temp_path = self.context.work_path
-        storage = get_storage()
+    def fetch(self) -> str | None:
+        """Fetch response and store in archive. Returns content_hash."""
         if self._content_hash is not None:
-            self._file_path = storage.load_file(self._content_hash, temp_path=temp_path)
-            return self._file_path
-        if self.response is not None:
-            self._file_path = random_filename(temp_path)
-            content_hash = sha1()
-            with open(self._file_path, "wb") as fh:
-                for chunk in self.response.iter_content(chunk_size=8192):
-                    content_hash.update(chunk)
-                    fh.write(chunk)
-            self._remove_file = True
-            chash = content_hash.hexdigest()
-            self._content_hash = storage.archive_file(
-                self._file_path, content_hash=chash
-            )
-            if self.http.cache and self.ok:
-                self.context.set_tag(self.request_id, self.serialize())
-            self.retrieved_at = datetime.utcnow().isoformat()
-        return self._file_path
+            return self._content_hash
 
-    def _complete(self):
-        if self._content_hash is None:
-            self.fetch()
+        if self.response is None:
+            return None
 
-    def _rate_limit(self, url):
+        # Stream response, computing hash and collecting chunks
+        content_hash = sha1()
+        chunks: list[bytes] = []
+        for chunk in self.response.iter_content(chunk_size=8192):
+            content_hash.update(chunk)
+            chunks.append(chunk)
+
+        # Store raw bytes in archive
+        self._content_hash = content_hash.hexdigest()
+        self.context.store_data(b"".join(chunks), checksum=self._content_hash)
+
+        # Cache HTTP metadata via tags for conditional requests
+        if self.http.cache and self.ok and self.request_id:
+            self.context.set_tag(self.request_id, self.serialize())
+
+        self.retrieved_at = datetime.now(timezone.utc).isoformat()
+        return self._content_hash
+
+    def _rate_limit(self, url: str) -> None:
+        """Apply rate limiting for the request URL."""
         resource = urlparse(url).netloc or url
         limit = self.context.get("http_rate_limit", settings.http_rate_limit)
         limit = limit / 60  # per minute to per second for stricter enforcement
@@ -218,7 +230,7 @@ class ContextHttpResponse(object):
         self.context.enforce_rate_limit(rate_limit)
 
     @property
-    def url(self):
+    def url(self) -> str | None:
         if self._response is not None:
             return self._response.url
         if self.request is not None:
@@ -227,72 +239,78 @@ class ContextHttpResponse(object):
         return self._url
 
     @property
-    def request_id(self):
+    def request_id(self) -> str | None:
         if self._request_id is not None:
             return self._request_id
         if self.request is not None:
-            parts = [self.request.method, self.url]
+            url_parts = urlsplit(self.url)
+            parts = [self.request.method, *url_parts[1:3]]
+            params = url_parts[3]
+            if params:
+                parts.append(hash_data(params))
             if self.request.data:
                 parts.append(hash_data(self.request.data))
             if self.request.json:
                 parts.append(hash_data(self.request.json))
-            return make_key(*parts)
+            return join_relpaths(*parts)
+        return None
 
     @property
-    def status_code(self):
+    def status_code(self) -> int | None:
         if self._status_code is None and self.response is not None:
             self._status_code = self.response.status_code
         return self._status_code
 
     @property
-    def headers(self):
+    def headers(self) -> CaseInsensitiveDict:
         if self._headers is None and self.response:
             self._headers = self.response.headers
         return self._headers or CaseInsensitiveDict()
 
     @property
-    def last_modified(self):
-        now = datetime.utcnow()
+    def last_modified(self) -> str | None:
         last_modified_header = self.headers.get("Last-Modified")
         if last_modified_header is not None:
             # Tue, 15 Nov 1994 12:45:26 GMT
             last_modified = parse_date(last_modified_header)
-            if last_modified < now + timedelta(seconds=30):
-                return last_modified.strftime("%Y-%m-%dT%H:%M:%S%z")
+            if last_modified is not None:
+                # Make timezone-aware comparison
+                now = datetime.now(timezone.utc)
+                lm_aware = last_modified.replace(tzinfo=timezone.utc)
+                if lm_aware < now + timedelta(seconds=30):
+                    return last_modified.strftime("%Y-%m-%dT%H:%M:%S%z")
         return None
 
     @property
-    def encoding(self):
+    def encoding(self) -> str | None:
+        """Detect content encoding from headers or content."""
         if self._encoding is None:
             mime = parse_mimetype(self.headers.get("content-type"))
             self._encoding = mime.charset
         if self._encoding is None:
-            with open(self.file_path, "rb") as fh:
-                self._encoding = guess_file_encoding(fh)
+            # Use raw bytes for encoding detection
+            raw = self.raw
+            if raw:
+                self._encoding = guess_file_encoding(io.BytesIO(raw))
         return self._encoding
 
     @encoding.setter
-    def encoding(self, encoding):
+    def encoding(self, encoding: str) -> None:
         self._encoding = encoding
 
     @property
-    def file_path(self):
-        self.fetch()
-        if self._file_path is not None:
-            return Path(self._file_path)
-
-    @property
-    def content_hash(self):
-        self.fetch()
+    def content_hash(self) -> str | None:
+        if self._content_hash is None:
+            self.fetch()
         return self._content_hash
 
     @property
-    def content_type(self):
+    def content_type(self) -> str | None:
         content_type = self.headers.get("content-type")
         return normalize_mimetype(content_type)
 
     @property
-    def file_name(self):
+    def file_name(self) -> str | None:
         disposition = self.headers.get("content-disposition")
         file_name = None
         if disposition is not None:
@@ -302,60 +320,70 @@ class ContextHttpResponse(object):
         return file_name
 
     @property
-    def ok(self):
+    def ok(self) -> bool:
         if self.status_code is None:
             return False
         return self.status_code < 400
 
-    @property
-    def raw(self):
-        if not hasattr(self, "_raw"):
-            self._raw = None
-            if self.file_path is not None:
-                with open(self.file_path, "rb") as fh:
-                    self._raw = fh.read()
-        return self._raw
+    @cached_property
+    def raw(self) -> bytes | None:
+        """Get raw response content from archive."""
+        if self.content_hash is None:
+            return None
+        with self.context.open(self.content_hash) as fh:
+            return fh.read()
 
-    @property
-    def text(self):
+    @cached_property
+    def text(self) -> str | None:
+        """Get response content as text."""
         if self.raw is None:
             return None
-        return self.raw.decode(self.encoding, "replace")
+        return self.raw.decode(self.encoding or "utf-8", "replace")
 
-    @property
+    @cached_property
     def html(self):
-        if not hasattr(self, "_html"):
-            self._html = None
-            if self.content_type in NON_HTML:
-                return
-            if self.raw is None or not len(self.raw):
-                return
-            try:
-                self._html = html.fromstring(self.text)
-            except ValueError as ve:
-                if "encoding declaration" in str(ve):
-                    self._html = html.parse(self.file_path.as_posix())
-            except (etree.ParserError, etree.ParseError):
-                pass
-        return self._html
+        """Parse HTML content."""
+        if self.content_hash is None:
+            return
+        if self.content_type in NON_HTML:
+            return None
+        text = self.text
+        if text is None or not len(text):
+            return None
+        try:
+            return html.fromstring(text)
+        except ValueError as ve:
+            if "encoding declaration" in str(ve):
+                # Need file-like object for lxml
+                with self.context.open(self.content_hash) as fh:
+                    return html.parse(fh)
+        except (etree.ParserError, etree.ParseError):
+            pass
+        return None
 
-    @property
+    @cached_property
     def xml(self):
-        if not hasattr(self, "_xml"):
-            parser = etree.XMLParser(
-                ns_clean=True, recover=True, resolve_entities=False, no_network=True
-            )
-            self._xml = etree.parse(self.file_path.as_posix(), parser=parser)
-        return self._xml
+        """Parse XML content."""
+        if self.content_hash is None:
+            return None
+        parser = etree.XMLParser(
+            ns_clean=True, recover=True, resolve_entities=False, no_network=True
+        )
+        with self.context.open(self.content_hash) as fh:
+            return etree.parse(fh, parser=parser)
 
-    @property
-    def json(self):
-        if not hasattr(self, "_json"):
-            if self.file_path is None:
-                raise ParseError("Cannot parse failed download.")
-            with open(self.file_path, "r") as fh:
-                self._json = json.load(fh)
-        return self._json
+    @cached_property
+    def json(self) -> Any:
+        """Parse JSON content."""
+        if self.raw is None:
+            raise ParseError("Cannot parse failed download.")
+        return json.loads(self.raw)
+
+    def local_path(self) -> ContextManager[Path]:
+        """Provide content as a local file path (for operations that need file paths)."""
+        if self.content_hash is None:
+            raise ValueError("No content available")
+        return self.context.local_path(self.content_hash)
 
     def __enter__(self):
         return self
@@ -363,13 +391,12 @@ class ContextHttpResponse(object):
     def __exit__(self, *args):
         self.close()
 
-    def close(self):
+    def close(self) -> None:
         if self._response is not None:
             self._response.close()
-        # Will be deleted by the context:
-        # storage.cleanup_file(self._content_hash)
 
-    def serialize(self):
+    def serialize(self) -> dict[str, Any]:
+        """Serialize response metadata for storage between stages."""
         self.fetch()
         data = {
             "request_id": self.request_id,
@@ -384,7 +411,8 @@ class ContextHttpResponse(object):
             data["modified_at"] = self.last_modified
         return data
 
-    def apply_data(self, data):
+    def apply_data(self, data: dict[str, Any]) -> None:
+        """Apply serialized data to restore response state."""
         self._status_code = data.get("status_code")
         self._url = data.get("url")
         self._request_id = data.get("request_id")
@@ -394,10 +422,13 @@ class ContextHttpResponse(object):
         self.retrieved_at = data.get("retrieved_at")
 
     @classmethod
-    def deserialize(cls, http, data):
+    def deserialize(
+        cls, http: ContextHttp, data: dict[str, Any]
+    ) -> ContextHttpResponse:
+        """Create a response from serialized data."""
         obj = cls(http)
         obj.apply_data(data)
         return obj
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<ContextHttpResponse(%s,%s)>" % (self.url, self._content_hash)

@@ -9,10 +9,9 @@ from anystore.util import ensure_uuid
 from openaleph_procrastinate.manage import cancel_jobs
 from openaleph_procrastinate.settings import OpenAlephSettings
 from procrastinate.jobs import DeleteJobCondition
-from servicelayer.cache import make_key
 from servicelayer.extensions import get_entry_point
 
-from memorious.core import settings, tags
+from memorious.core import get_tags, settings
 from memorious.model import CrawlerConfig, CrawlerStage
 
 log = logging.getLogger(__name__)
@@ -98,7 +97,8 @@ class Crawler:
         self.flush_tags()
 
     def flush_tags(self):
-        tags.delete(prefix=make_key(self, "tag"))
+        tags = get_tags(self.name)
+        tags.delete(prefix=self.name)
 
     def cancel(self):
         """Cancel all pending/running jobs for this crawler."""

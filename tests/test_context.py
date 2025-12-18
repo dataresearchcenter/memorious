@@ -10,7 +10,7 @@ class TestContext(object):
     def test_content_hash(self, context):
         content_hash = context.store_data(json.dumps({"hello": "world"}))
         assert isinstance(content_hash, str)
-        with context.load_file(content_hash) as fh:
+        with context.open(content_hash) as fh:
             assert hasattr(fh, "read")
 
     def test_dump_load_state(self, context, crawler, stage, manager):

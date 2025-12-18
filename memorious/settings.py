@@ -5,13 +5,12 @@ All settings can be set via environment variables with MEMORIOUS_ prefix,
 or via Docker secrets in /run/secrets directory.
 """
 
-from functools import cached_property
 from importlib.metadata import version
 from pathlib import Path
 
+from anystore.settings import BaseSettings
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from servicelayer import settings as sls
+from pydantic_settings import SettingsConfigDict
 
 # Get version from package metadata
 try:
@@ -38,13 +37,11 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
         env_file=".env",
         secrets_dir="/run/secrets",
+        # secrets_dir_missing="ok",  # FIXME
         extra="ignore",
     )
 
     # Core configuration
-    app_name: str = Field(default="memorious")
-    debug: bool = Field(default=False)
-    testing: bool = Field(default=False, alias="testing")
     base_path: Path = Field(default_factory=lambda: Path.cwd() / "data")
     config_path: Path | None = Field(default=None)
 
@@ -54,33 +51,18 @@ class Settings(BaseSettings):
     expire: int = Field(default=1, description="Days until incremental crawl expires")
 
     # Rate limiting
-    db_rate_limit: int = Field(default=6000)
     http_rate_limit: int = Field(default=120)
-    max_queue_length: int = Field(default=50000)
 
     # HTTP configuration
     http_cache: bool = Field(default=True)
     http_timeout: float = Field(default=30.0)
     user_agent: str = Field(
         default="Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.1) "
-        f"aleph.memorious/{VERSION}"
+        f"memorious/{VERSION}"
     )
 
+    cache_uri: str | None = Field(default="memory://")
+    """Cache uri for runtime cache (defaults to in-memory)"""
+
     tags_uri: str | None = Field(default=None)
-    """Tags storage for incremental crawling and HTTP caching."""
-
-    @cached_property
-    def archive_path(self) -> Path:
-        return self.base_path / "archive"
-
-    @cached_property
-    def resolved_tags_uri(self) -> str:
-        """Tags store URI, defaults to SQLite in base_path."""
-        if self.tags_uri:
-            return self.tags_uri
-        return f"sqlite:///{self.base_path / 'tags.sqlite3'}"
-
-    def init_servicelayer(self) -> None:
-        """Initialize servicelayer settings from memorious settings."""
-        if not sls.ARCHIVE_PATH:
-            sls.ARCHIVE_PATH = str(self.archive_path)
+    """Tags storage for incremental crawling and HTTP caching (default in archive)"""

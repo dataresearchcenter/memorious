@@ -73,7 +73,7 @@ def aleph_emit_document(context, data):
 
     label = meta.get("file_name", meta.get("source_url"))
     context.log.info("Upload: %s", label)
-    with context.load_file(content_hash) as fh:
+    with context.open(content_hash) as fh:
         if fh is None:
             return
         file_path = Path(fh.name).resolve()
