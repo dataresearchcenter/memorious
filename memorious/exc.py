@@ -34,3 +34,23 @@ class RateLimitException(Exception):
     """Rate limit exceeded for a crawler operation"""
 
     pass
+
+
+class MetaDataError(MemoriousException):
+    """Raised when required metadata is missing or invalid."""
+
+    pass
+
+
+class RegexError(MemoriousException):
+    """Raised when regex extraction fails."""
+
+    def __init__(self, message: str, value: str | None = None):
+        self.value = value
+        super().__init__(message)
+
+
+class XPathError(MemoriousException):
+    """Raised when XPath extraction fails."""
+
+    pass

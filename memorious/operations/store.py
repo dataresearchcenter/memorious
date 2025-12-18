@@ -1,16 +1,30 @@
+"""File storage operations.
+
+This module provides operations for storing crawled files to various
+backends including local directories and ftm-lakehouse archives.
+"""
+
+from __future__ import annotations
+
 import json
 import mimetypes
 import os
 import shutil
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from ftm_lakehouse import get_lakehouse
 from normality import safe_filename
 from rigour.mime import normalize_mimetype
 
+from memorious.logic.incremental import mark_incremental_complete
 
-def _get_directory_path(context):
-    """Get the storage path from the output."""
+if TYPE_CHECKING:
+    from memorious.logic.context import Context
+
+
+def _get_directory_path(context: Context) -> str:
+    """Get the storage path for directory storage."""
     path = os.path.join(context.settings.base_path, "store")
     path = context.params.get("path", path)
     path = os.path.join(path, context.crawler.name)
@@ -22,7 +36,8 @@ def _get_directory_path(context):
     return path
 
 
-def _get_file_extension(file_name, mime_type):
+def _get_file_extension(file_name: str | None, mime_type: str | None) -> str:
+    """Determine file extension from filename or MIME type."""
     if file_name is not None:
         _, extension = os.path.splitext(file_name)
         extension = extension.replace(".", "")
@@ -37,8 +52,28 @@ def _get_file_extension(file_name, mime_type):
     return "raw"
 
 
-def directory(context, data):
-    """Store the collected files to a given directory."""
+def directory(context: Context, data: dict[str, Any]) -> None:
+    """Store collected files to a local directory.
+
+    Saves files to a directory structure organized by crawler name.
+    Also stores metadata as a JSON sidecar file.
+
+    Args:
+        context: The crawler context.
+        data: Must contain content_hash from a fetched response.
+
+    Params:
+        path: Custom storage path (default: {base_path}/store/{crawler_name}).
+
+    Example:
+        ```yaml
+        pipeline:
+          store:
+            method: directory
+            params:
+              path: /data/documents
+        ```
+    """
     with context.http.rehash(data) as result:
         if not result.ok:
             return
@@ -69,11 +104,27 @@ def directory(context, data):
             json.dump(data, fh)
 
 
-def lakehouse(context, data):
-    """Store the collected file in the ftm-lakehouse archive.
+def lakehouse(context: Context, data: dict[str, Any]) -> None:
+    """Store collected file in the ftm-lakehouse archive.
 
-    Optional params:
-        uri: Custom lakehouse URI to store files (default: context.archive)
+    Stores files in a structured archive with metadata tracking,
+    suitable for integration with Aleph and other FTM-based systems.
+
+    Args:
+        context: The crawler context.
+        data: Must contain content_hash from a fetched response.
+
+    Params:
+        uri: Custom lakehouse URI (default: context.archive).
+
+    Example:
+        ```yaml
+        pipeline:
+          store:
+            method: lakehouse
+            params:
+              uri: s3://bucket/archive
+        ```
     """
     with context.http.rehash(data) as result:
         if not result.ok:
@@ -100,7 +151,6 @@ def lakehouse(context, data):
             archive = context.archive
 
         # Store file in lakehouse archive with metadata
-        # file_info = File(name=file_name, checksum=content_hash)
         with result.local_path() as local_path:
             file_info = archive.archive_file(
                 local_path,
@@ -114,8 +164,23 @@ def lakehouse(context, data):
         context.emit(data=data)
 
 
-def cleanup_archive(context, data):
-    """Remove a blob from the archive after we're done with it"""
+def cleanup_archive(context: Context, data: dict[str, Any]) -> None:
+    """Remove a blob from the archive.
+
+    Deletes a file from the archive after processing is complete.
+    Useful for cleaning up temporary files.
+
+    Args:
+        context: The crawler context.
+        data: Must contain content_hash of file to delete.
+
+    Example:
+        ```yaml
+        pipeline:
+          cleanup:
+            method: cleanup_archive
+        ```
+    """
     content_hash = data.get("content_hash")
     if content_hash is None:
         context.emit_warning("No content hash in data.")
@@ -126,3 +191,45 @@ def cleanup_archive(context, data):
             context.archive.delete_file(file_info)
         except NotImplementedError:
             context.log.warning("File deletion not supported by storage backend")
+
+
+def store(context: Context, data: dict[str, Any]) -> None:
+    """Store with configurable backend and incremental marking.
+
+    A flexible store operation that delegates to other storage methods
+    and marks incremental completion when the target stage is reached.
+
+    Args:
+        context: The crawler context.
+        data: Must contain content_hash from a fetched response.
+
+    Params:
+        operation: Storage operation name (default: "directory").
+            Options: "directory", "lakehouse"
+
+    Example:
+        ```yaml
+        pipeline:
+          store:
+            method: store
+            params:
+              operation: lakehouse
+        ```
+
+    Note:
+        When using advanced incremental crawling (skip_incremental),
+        this operation automatically marks the target as complete,
+        allowing future runs to skip earlier stages.
+    """
+    operation = context.params.get("operation", "directory")
+
+    if operation == "directory":
+        directory(context, data)
+    elif operation == "lakehouse":
+        lakehouse(context, data)
+    else:
+        context.log.error(f"Unknown store operation: {operation}")
+        return
+
+    # Mark incremental completion if this is the target stage
+    mark_incremental_complete(context, data)
