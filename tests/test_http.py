@@ -2,26 +2,30 @@ import httpx
 from lxml import etree, html
 
 from memorious.logic.http import ContextHttpResponse
-from memorious.model.session import SessionModel
+from memorious.model.session import CookieModel, SessionModel
 
 
 class TestSessionModel:
     def test_session_model_serialization(self):
         """Test SessionModel can serialize and deserialize."""
         model = SessionModel(
-            cookies={"session_id": "abc123"},
+            cookies=[CookieModel(name="session_id", value="abc123")],
             headers={"X-Custom": "value"},
             auth_header="Basic dXNlcjpwYXNzd29yZA==",
         )
         # Serialize to dict
         data = model.model_dump()
-        assert data["cookies"] == {"session_id": "abc123"}
+        assert len(data["cookies"]) == 1
+        assert data["cookies"][0]["name"] == "session_id"
+        assert data["cookies"][0]["value"] == "abc123"
         assert data["headers"] == {"X-Custom": "value"}
         assert data["auth_header"] == "Basic dXNlcjpwYXNzd29yZA=="
 
         # Deserialize from dict
         restored = SessionModel.model_validate(data)
-        assert restored.cookies == {"session_id": "abc123"}
+        assert len(restored.cookies) == 1
+        assert restored.cookies[0].name == "session_id"
+        assert restored.cookies[0].value == "abc123"
         assert restored.headers == {"X-Custom": "value"}
         assert restored.auth_header == "Basic dXNlcjpwYXNzd29yZA=="
 
@@ -33,7 +37,10 @@ class TestSessionModel:
         client.auth = ("testuser", "testpass")
 
         model = SessionModel.from_client(client)
-        assert model.cookies.get("test_cookie") == "cookie_value"
+        # Find cookie by name
+        cookie = next((c for c in model.cookies if c.name == "test_cookie"), None)
+        assert cookie is not None
+        assert cookie.value == "cookie_value"
         assert model.headers.get("x-test-header") == "header_value"
         assert model.auth_header is not None
         assert model.auth_header.startswith("Basic ")
@@ -43,7 +50,7 @@ class TestSessionModel:
     def test_session_model_apply_to_client(self):
         """Test applying session state to httpx.Client."""
         model = SessionModel(
-            cookies={"restored_cookie": "restored_value"},
+            cookies=[CookieModel(name="restored_cookie", value="restored_value")],
             headers={"X-Restored": "restored_header"},
             auth_header="Basic dXNlcjpwYXNzd29yZA==",
         )
@@ -56,6 +63,24 @@ class TestSessionModel:
         assert client.headers.get("Authorization") == "Basic dXNlcjpwYXNzd29yZA=="
 
         client.close()
+
+    def test_session_model_duplicate_cookies(self):
+        """Test handling multiple cookies with the same name but different domains."""
+        client = httpx.Client()
+        client.cookies.set("INGRESSCOOKIE", "value1", domain="example.com")
+        client.cookies.set("INGRESSCOOKIE", "value2", domain="other.com")
+
+        # Should not raise CookieConflict
+        model = SessionModel.from_client(client)
+        assert len(model.cookies) == 2
+
+        # Apply to new client
+        client2 = httpx.Client()
+        model.apply_to_client(client2)
+        assert len(list(client2.cookies.jar)) == 2
+
+        client.close()
+        client2.close()
 
     def test_session_model_roundtrip(self):
         """Test full roundtrip: client -> model -> dict -> model -> client."""
