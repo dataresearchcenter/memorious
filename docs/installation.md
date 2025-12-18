@@ -1,106 +1,80 @@
 # Installation
 
-Memorious can be installed directly via pip and run from the command line.
-
-## Quick Start
-
-```bash
-# Install memorious
-pip install memorious
-
-# Run a crawler
-memorious run path/to/crawler.yml
-```
-
-## Installation Options
-
-### From PyPI
+## From PyPI
 
 ```bash
 pip install memorious
 ```
 
-### From Source
+## From Source
 
 ```bash
-git clone https://github.com/alephdata/memorious.git
+git clone https://github.com/dataresearchcenter/memorious.git
 cd memorious
 pip install -e .
 ```
 
-## Running a Crawler
+## Optional Dependencies
 
-Crawlers are defined in YAML configuration files. To run a crawler:
+Memorious has optional dependencies for specific features:
 
 ```bash
-memorious run my_crawler.yml
+# SQL database support (SQLite, PostgreSQL)
+pip install memorious[sql]
+
+# PostgreSQL with psycopg2
+pip install memorious[postgres]
+
+# Redis support
+pip install memorious[redis]
+
+# FTP support
+pip install memorious[ftp]
 ```
 
-If your crawler uses custom Python modules, use the `--src` option to add them to the Python path:
+## Verify Installation
 
 ```bash
-memorious run my_crawler.yml --src ./src
+memorious --version
 ```
 
-See the [CLI Reference](cli.md) for all available commands.
+## Environment Setup
 
-## Environment Variables
-
-Your Memorious instance is configured by environment variables. For a complete list, see the [Settings Reference](reference/settings.md).
-
-### Quick Reference
-
-**Core Settings:**
-
-- `MEMORIOUS_BASE_PATH`: base directory for data storage (default: `./data`)
-- `MEMORIOUS_DEBUG`: enable debug mode (default: `false`)
-- `MEMORIOUS_INCREMENTAL`: enable incremental crawling (default: `true`)
-- `MEMORIOUS_EXPIRE`: days until cached data expires (default: `1`)
-
-**HTTP Settings:**
-
-- `MEMORIOUS_HTTP_RATE_LIMIT`: max HTTP requests per host per minute (default: `120`)
-- `MEMORIOUS_HTTP_CACHE`: enable HTTP response caching (default: `true`)
-- `MEMORIOUS_USER_AGENT`: custom User-Agent string
-
-**Storage Settings:**
-
-- `MEMORIOUS_CACHE_URI`: URI for runtime cache (default: `memory://`)
-- `MEMORIOUS_TAGS_URI`: URI for tags/incremental state storage
-- `LAKEHOUSE_URI`: base URI for archive storage (default: `./data`)
-
-**Job Queue:**
-
-- `PROCRASTINATE_DB_URI`: database URI for job queue (default: `memory:`)
-
-**Integrations:**
-
-- `FTM_STORE_URI`: database URI for FTM entity storage
-- `ALEPH_HOST`: Aleph instance URL
-- `ALEPH_API_KEY`: API key for Aleph authentication
-
-## Production Deployment
-
-For production deployments with multiple workers, you'll need:
-
-1. **PostgreSQL** for the job queue (`PROCRASTINATE_DB_URI`)
-2. **Redis** (optional) for shared cache across workers (`MEMORIOUS_CACHE_URI`)
-
-Example production configuration:
+Memorious is configured via environment variables. Create a `.env` file or export them:
 
 ```bash
+# Base directory for data storage
+export MEMORIOUS_BASE_PATH=./data
+
+# Enable debug logging
+export MEMORIOUS_DEBUG=true
+```
+
+### Development Setup
+
+For local development and testing, in-memory storage works out of the box:
+
+```bash
+export MEMORIOUS_BASE_PATH=./data
+export MEMORIOUS_CACHE_URI=memory://
+export PROCRASTINATE_DB_URI=memory:
+export PROCRASTINATE_SYNC=1
+```
+
+### Production Setup
+
+For production with multiple workers:
+
+```bash
+# Core
 export MEMORIOUS_BASE_PATH=/var/lib/memorious
+
+# Redis for shared cache
 export MEMORIOUS_CACHE_URI=redis://localhost:6379/0
+
+# PostgreSQL for job queue and tags
 export MEMORIOUS_TAGS_URI=postgresql://user:pass@localhost/memorious
 export PROCRASTINATE_DB_URI=postgresql://user:pass@localhost/memorious
 ```
 
-Start a worker to process crawler jobs:
-
-```bash
-memorious worker --concurrency 4
-```
-
-## Building a Crawler
-
-Check out the [reference documentation](reference.md) to learn how to build your own crawlers.
+See the [Settings Reference](reference/settings.md) for all configuration options.

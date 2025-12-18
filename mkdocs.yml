@@ -2,13 +2,17 @@ site_name: memorious
 site_url: https://docs.investigraph.dev/lib/memorious
 repo_url: https://github.com/dataresearchcenter/memorious
 nav:
-  - Start: index.md
-  - installation.md
-  - CLI Reference: cli.md
-  - Crawler Reference: reference.md
-  - Settings Reference: reference/settings.md
-  - Operations Reference: reference/operations.md
-  - development.md
+  - Home: index.md
+  - Quick Start: start.md
+  - Installation: installation.md
+  - Crawlers: crawler.md
+  - Operations: operations.md
+  - Development: development.md
+  - Reference:
+      - CLI: reference/cli.md
+      - Crawler: reference/crawler.md
+      - Operations: reference/operations.md
+      - Settings: reference/settings.md
 theme:
   name: material
   logo: https://cdn.investigativedata.org/style/logos/darc/svg/DARC-Logo-RGB-Horizontal-Neg.svg
@@ -18,7 +22,6 @@ theme:
     - navigation.instant
     - navigation.tracking
     - navigation.sections
-    # - navigation.footer
     - toc.follow
     - content.code.copy
 extra_css:
