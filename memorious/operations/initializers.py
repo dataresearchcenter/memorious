@@ -254,7 +254,7 @@ def dates(context: Context, data: dict[str, Any]) -> None:
         days=context.params.get("days", 0), weeks=context.params.get("weeks", 0)
     )
     if delta == timedelta():
-        context.log.error("No interval given: %r", context.params)
+        context.log.error("No interval given", params=context.params)
         return
 
     if "end" in context.params:

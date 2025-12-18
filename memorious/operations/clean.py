@@ -126,7 +126,9 @@ def clean(context: Context, data: dict[str, Any]) -> None:
             try:
                 data[key] = values.format(**data)
             except KeyError as e:
-                context.log.warning(f"Missing key for format string '{key}': {e}")
+                context.log.warning(
+                    "Missing key for format string", key=key, error=str(e)
+                )
 
     # Validate required
     for key in ensure_list(context.params.get("required")):

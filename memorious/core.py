@@ -2,6 +2,7 @@ import logging
 import os
 
 from anystore.functools import weakref_cache as cache
+from anystore.logging import get_logger
 from anystore.store import get_store
 from anystore.tags import Tags
 from ftm_lakehouse.lake.lakehouse import get_archive
@@ -13,7 +14,7 @@ from werkzeug.local import LocalProxy
 
 from memorious.settings import Settings
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 @cache

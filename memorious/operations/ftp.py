@@ -13,7 +13,7 @@ settings = Settings()
 
 def ftp_fetch(context, data):
     url = data.get("url")
-    context.log.info("FTP fetch: %s", url)
+    context.log.info("FTP fetch", url=url)
     requests_ftp.monkeypatch_session()
     session = requests.Session()
     username = context.get("username", "Anonymous")
@@ -48,5 +48,5 @@ def ftp_fetch(context, data):
         for child in resp.iter_lines(decode_unicode=True):
             child_data = data.copy()
             child_data["url"] = os.path.join(url, child)
-            context.log.info("FTP directory child: %(url)s", child_data)
+            context.log.info("FTP directory child", url=child_data["url"])
             context.emit(rule="child", data=child_data)

@@ -113,19 +113,19 @@ class Context:
         if optional and stage is None:
             return
         if stage is None or stage not in self.crawler.stages:
-            self.log.info("No next stage: %s (%s)" % (stage, rule))
+            self.log.info("No next stage", stage=stage, rule=rule)
             return
 
         # Debug sampling
         if self.settings.debug:
             sampling_rate = self.get("sampling_rate")
             if sampling_rate and random.random() > float(sampling_rate):
-                self.log.info("Skipping emit due to sampling rate")
+                self.log.info("Skipping emit due to sampling rate", rate=sampling_rate)
                 return
 
         # Log delay warning (procrastinate supports scheduled_at, but we simplify)
         if delay and delay > 0:
-            self.log.debug("Delay of %ds requested but not applied" % delay)
+            self.log.debug("Delay requested but not applied", delay=delay)
 
         # Make a copy of the data to avoid mutation when in-memory connector
         data = deepcopy(data)
@@ -151,13 +151,8 @@ class Context:
         """Execute the stage method with the given data."""
         try:
             self.log.info(
-                "[%s->%s(%s)]: %s"
-                % (
-                    self.crawler.name,
-                    self.stage.name,
-                    self.stage.method_name,
-                    self.run_id,
-                )
+                "Executing stage",
+                method=self.stage.method_name,
             )
             return self.stage.method(self, data)
         except Exception as exc:
@@ -167,8 +162,8 @@ class Context:
         finally:
             shutil.rmtree(self.work_path)
 
-    def emit_warning(self, message: str, *args: Any) -> None:
-        self.log.warning(message, *args)
+    def emit_warning(self, message: str, **kwargs: Any) -> None:
+        self.log.warning(message, **kwargs)
 
     def emit_exception(self, exc: Exception) -> None:
         self.log.exception(str(exc))

@@ -113,7 +113,7 @@ def paginate(context: Context, data: dict[str, Any], html: HtmlElement) -> None:
     next_page = calculate_next_page(html, current, config)
 
     if next_page:
-        context.log.info(f"Next page: {next_page}")
+        context.log.info("Next page", page=next_page)
         next_data = {**data, "page": next_page}
         param = config.get("param", "page")
         if "url" in next_data:

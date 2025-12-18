@@ -229,7 +229,9 @@ class ContextHttpResponse:
             )
 
             if existing is not None and response.status_code == 304:
-                self.context.log.info("Using cached HTTP response: %s", response.url)
+                self.context.log.info(
+                    "Using cached HTTP response", url=str(response.url)
+                )
                 response.close()
                 self.apply_data(existing)
             else:

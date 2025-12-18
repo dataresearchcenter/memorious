@@ -32,7 +32,7 @@ def inspect(context: Context, data: dict[str, Any]) -> None:
               pass: store
         ```
     """
-    context.log.info(pformat(data))
+    context.log.info("Inspect data", data=pformat(data))
     context.emit(data=data, optional=True)
 
 

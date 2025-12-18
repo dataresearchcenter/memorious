@@ -92,7 +92,7 @@ def should_skip_incremental(
         data["skip_incremental"] = {"target": target, "key": target_key}
 
         if context.check_tag(target_key):
-            context.log.info(f"Skipping (incremental): {target_key}")
+            context.log.info("Skipping (incremental)", key=target_key)
             return True
 
     return False
@@ -118,4 +118,4 @@ def mark_incremental_complete(context: Context, data: dict[str, Any]) -> None:
         key = incremental.get("key")
         if key:
             context.set_tag(key, True)
-            context.log.debug(f"Marked incremental complete: {key}")
+            context.log.debug("Marked incremental complete", key=key)

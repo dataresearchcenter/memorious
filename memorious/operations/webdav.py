@@ -17,7 +17,7 @@ def dav_index(context, data):
     # it they are "standards compliant" and it should thus work for
     # other DAV servers.
     url = data.get("url")
-    context.log.info("Fetching WebDAV path: %s" % url)
+    context.log.info("Fetching WebDAV path", url=url)
     result = context.http.request("PROPFIND", url)
     for resp in result.xml.findall("./{DAV:}response"):
         href = resp.findtext("./{DAV:}href")

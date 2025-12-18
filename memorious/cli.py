@@ -1,12 +1,12 @@
 """Memorious CLI - command line interface for crawler management."""
 
-import logging
 import sys
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 from anystore.functools import weakref_cache as cache
+from anystore.logging import get_logger
 from openaleph_procrastinate.app import run_sync_worker
 from rich.console import Console
 from rich.table import Table
@@ -16,7 +16,7 @@ from memorious.logic.manager import CrawlerManager
 from memorious.settings import VERSION
 from memorious.tasks import app as procrastinate_app
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 console = Console(stderr=True)
 
 cli = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=settings.debug)

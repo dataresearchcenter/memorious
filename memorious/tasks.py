@@ -6,11 +6,11 @@ The task receives the stage payload, executes the appropriate operation,
 and defers new tasks for subsequent stages.
 """
 
-import logging
 from pathlib import Path
 from typing import Any
 
 from anystore.functools import weakref_cache as cache
+from anystore.logging import get_logger
 from anystore.types import Uri
 from openaleph_procrastinate.app import App, make_app
 from openaleph_procrastinate.model import DatasetJob
@@ -19,7 +19,7 @@ from openaleph_procrastinate.tasks import task
 from memorious.logic.crawler import Crawler
 from memorious.logic.manager import CrawlerManager
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 # Create the procrastinate app
 app: App = make_app("memorious.tasks")

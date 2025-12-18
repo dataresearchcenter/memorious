@@ -26,7 +26,9 @@ def ftm_store(context, data):
     bulk = dataset.bulk()
     entities = ensure_list(data.get("entities", data))
     for entity in entities:
-        context.log.debug("Store entity [%(schema)s]: %(id)s", entity)
+        context.log.debug(
+            "Store entity", schema=entity.get("schema"), id=entity.get("id")
+        )
         bulk.put(entity, entity.pop("fragment", None))
         context.emit(rule="fragment", data=data, optional=True)
     context.emit(data=data, optional=True)

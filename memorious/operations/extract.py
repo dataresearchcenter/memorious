@@ -45,7 +45,7 @@ def extract_zip(file_path: str, extract_dir: str, context: Context) -> list[str]
     files = []
     with zipfile.ZipFile(file_path, "r") as zip_ref:
         if zip_ref.testzip() is not None:
-            context.log.warning("Bad zip file: %s", file_path)
+            context.log.warning("Bad zip file", file=file_path)
         zip_ref.extractall(extract_dir)
         for name in zip_ref.namelist():
             extracted = os.path.join(extract_dir, name)
@@ -61,7 +61,7 @@ def extract_tar(file_path: str, extract_dir: str, context: Context) -> list[str]
         for name in tar_ref.getnames():
             if name.startswith("..") or name.startswith("/"):
                 context.log.info(
-                    "Bad path %s while extracting archive at %s", name, file_path
+                    "Bad path while extracting archive", path=name, file=file_path
                 )
             else:
                 tar_ref.extract(name, extract_dir)
@@ -76,7 +76,7 @@ def extract_7zip(file_path: str, extract_dir: str, context: Context) -> list[str
     files = []
     return_code = subprocess.call(["7z", "x", file_path, "-r", "-o%s" % extract_dir])
     if return_code != 0:
-        context.log.warning("Couldn't extract file: %s", file_path)
+        context.log.warning("Couldn't extract file", file=file_path)
         return files
     for root, _, filenames in os.walk(extract_dir):
         for filename in filenames:
@@ -136,7 +136,7 @@ def extract(context: Context, data: dict[str, Any]) -> None:
                 extracted_files = extract_7zip(file_path, extract_dir, context)
             else:
                 context.log.warning(
-                    "Unsupported archive content type: %s", content_type
+                    "Unsupported archive content type", content_type=content_type
                 )
                 return
 

@@ -3,10 +3,15 @@ import logging
 import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
-logging.getLogger("zeep").setLevel(logging.WARNING)
-logging.getLogger("httpstream").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logging.getLogger("rdflib").setLevel(logging.WARNING)
-logging.getLogger("chardet").setLevel(logging.WARNING)
+
+# Silence noisy third-party loggers
+for logger_name in (
+    "httpx",
+    "httpcore",
+    "zeep",
+    "httpstream",
+    "urllib3",
+    "rdflib",
+    "chardet",
+):
+    logging.getLogger(logger_name).setLevel(logging.WARNING)

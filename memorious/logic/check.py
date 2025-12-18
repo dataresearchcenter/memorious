@@ -9,18 +9,18 @@ class ContextCheck(object):
     def __init__(self, context):
         self.context = context
 
-    def shout(self, msg, strict=False, *args):
+    def shout(self, msg, strict=False, **kwargs):
         if strict:
-            raise ValueError(msg % args)
+            raise ValueError(msg)
         else:
-            self.context.log.info(msg, *args)
+            self.context.log.info(msg, **kwargs)
 
     def is_not_empty(self, value, strict=False):
         """if value is not empty"""
         value = stringify(value)
         if value is not None:
             return
-        self.shout("Value %r is empty", strict, value)
+        self.shout("Value is empty", strict, value=value)
 
     def is_numeric(self, value, strict=False):
         """if value is numeric"""
@@ -28,7 +28,7 @@ class ContextCheck(object):
         if value is not None:
             if value.isnumeric():
                 return
-        self.shout("value %r is not numeric", strict, value)
+        self.shout("Value is not numeric", strict, value=value)
 
     def is_integer(self, value, strict=False):
         """if value is an integer"""
@@ -38,7 +38,7 @@ class ContextCheck(object):
         value = stringify(value)
         if value is not None and value.isnumeric():
             return
-        self.shout("value %r is not an integer", strict, value)
+        self.shout("Value is not an integer", strict, value=value)
 
     def match_date(self, value, strict=False):
         """if value is a date"""
@@ -46,7 +46,7 @@ class ContextCheck(object):
         try:
             parse(value)
         except Exception:
-            self.shout("Value %r is not a valid date", strict, value)
+            self.shout("Value is not a valid date", strict, value=value)
 
     def match_regexp(self, value, q, strict=False):
         """if value matches a regexp q"""
@@ -55,7 +55,7 @@ class ContextCheck(object):
         if value is not None:
             if mr.match(value):
                 return
-        self.shout("%r not matching the regexp %r", strict, value, q)
+        self.shout("Value not matching the regexp", strict, value=value, pattern=q)
 
     def has_length(self, value, q, strict=False):
         """if value has a length of q"""
@@ -63,11 +63,11 @@ class ContextCheck(object):
         if value is not None:
             if len(value) == q:
                 return
-        self.shout("Value %r not matching length %r", strict, value, q)
+        self.shout("Value not matching length", strict, value=value, expected=q)
 
     def must_contain(self, value, q, strict=False):
         """if value must contain q"""
         if value is not None:
             if value.find(q) != -1:
                 return
-        self.shout("Value %r does not contain %r", strict, value, q)
+        self.shout("Value does not contain expected", strict, value=value, expected=q)

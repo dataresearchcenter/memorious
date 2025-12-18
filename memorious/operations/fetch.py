@@ -129,7 +129,7 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
 
     # Validate URL scheme
     if urlparse(url).scheme not in ("http", "https", ""):
-        context.log.info("Fetch skipped. Unsupported scheme: %r" % url)
+        context.log.info("Fetch skipped, unsupported scheme", url=url)
         return
 
     attempt = data.pop("retry_attempt", 1)
@@ -137,16 +137,17 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
         result = context.http.get(url, lazy=True)
         rules = context.get("rules", {"match_all": {}})
         if not parse_rule(rules).apply(result):
-            context.log.info("Fetch skip: %r" % result.url)
+            context.log.info("Fetch skip (rule)", url=result.url)
             return
 
         if not result.ok:
-            err = (result.url, result.status_code)
-            context.emit_warning("Fetch fail [%s]: HTTP %s" % err)
+            context.emit_warning(
+                "Fetch fail", url=result.url, status=result.status_code
+            )
             if not context.params.get("emit_errors", False):
                 return
         else:
-            context.log.info("Fetched [%s]: %r" % (result.status_code, result.url))
+            context.log.info("Fetched", url=result.url, status=result.status_code)
 
         data.update(result.serialize())
         if url != result.url:
@@ -156,11 +157,11 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
     except httpx.HTTPError as ce:
         retries = int(context.get("retry", 3))
         if retries >= attempt:
-            context.log.warn("Retry: %s (error: %s)", url, ce)
+            context.log.warning("Retry", url=url, error=str(ce), attempt=attempt)
             data["retry_attempt"] = attempt + 1
             context.recurse(data=data, delay=2**attempt)
         else:
-            context.emit_warning("Fetch fail [%s]: %s" % (url, ce))
+            context.emit_warning("Fetch fail", url=url, error=str(ce))
 
 
 def session(context: Context, data: dict[str, Any]) -> None:
@@ -289,7 +290,7 @@ def post(context: Context, data: dict[str, Any]) -> None:
         return
 
     post_data = _get_post_data(context, data)
-    context.log.debug(f"POST to {url}: {post_data}")
+    context.log.debug("POST request", url=url)
     result = context.http.post(url, data=post_data)
     context.emit(data={**data, **result.serialize()})
 
@@ -332,7 +333,7 @@ def post_json(context: Context, data: dict[str, Any]) -> None:
         return
 
     json_data = _get_post_data(context, data)
-    context.log.debug(f"POST JSON to {url}: {json_data}")
+    context.log.debug("POST JSON request", url=url)
     result = context.http.post(url, json_data=json_data)
     context.emit(data={**data, **result.serialize()})
 
@@ -381,7 +382,7 @@ def post_form(context: Context, data: dict[str, Any]) -> None:
 
     action, form_data = extract_form(result.html, form_xpath)
     if action is None:
-        context.log.error(f"Form not found: {form_xpath}")
+        context.log.error("Form not found", xpath=form_xpath)
         return
 
     base_url = data.get("url", "")
@@ -389,7 +390,7 @@ def post_form(context: Context, data: dict[str, Any]) -> None:
 
     # Merge form data with additional data from params
     form_data.update(_get_post_data(context, data))
-    context.log.debug(f"POST form to {url}: {form_data}")
+    context.log.debug("POST form request", url=url)
     post_result = context.http.post(url, data=form_data)
     context.emit(data={**data, **post_result.serialize()})
 

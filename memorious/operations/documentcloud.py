@@ -47,7 +47,7 @@ def documentcloud_query(context, data):
 
     search_url = urljoin(host, "/api/documents/search")
 
-    context.log.info(f"Searching DocumentCloud for query: {query}, page: {page}")
+    context.log.info("Searching DocumentCloud", query=query, page=page)
     res = context.http.get(
         search_url,
         params={"q": query, "per_page": 100, "page": page, "expand": "organization"},
@@ -82,7 +82,7 @@ def documentcloud_query(context, data):
             )
             if context.check_tag(key):
                 context.log.info(
-                    f"Skipping processing of document: {doc['foreign_id']}"
+                    "Skipping processing of document", foreign_id=doc["foreign_id"]
                 )
                 continue
 
@@ -115,7 +115,5 @@ def documentcloud_mark_processed(context, data):
         data["foreign_id"],
         data["content_hash"],
     )
-    context.log.info(
-        f"Document with foreign id {data['foreign_id']} has been processed"
-    )
+    context.log.info("Document has been processed", foreign_id=data["foreign_id"])
     context.set_tag(key, "processed")

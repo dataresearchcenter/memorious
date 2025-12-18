@@ -98,7 +98,7 @@ def directory(context: Context, data: dict[str, Any]) -> None:
             with result.local_path() as p:
                 shutil.copyfile(p, file_path)
 
-        context.log.info("Store [directory]: %s", file_name)
+        context.log.info("Store [directory]", file=file_name)
         meta_path = os.path.join(path, "%s.json" % content_hash)
         with open(meta_path, "w") as fh:
             json.dump(data, fh)
@@ -160,7 +160,9 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
                 source_url=data.get("url"),
             )
 
-        context.log.info("Store [lakehouse]: %s (%s)" % (file_name, file_info.checksum))
+        context.log.info(
+            "Store [lakehouse]", file=file_name, checksum=file_info.checksum
+        )
         context.emit(data=data)
 
 
@@ -228,7 +230,7 @@ def store(context: Context, data: dict[str, Any]) -> None:
     elif operation == "lakehouse":
         lakehouse(context, data)
     else:
-        context.log.error(f"Unknown store operation: {operation}")
+        context.log.error("Unknown store operation", operation=operation)
         return
 
     # Mark incremental completion if this is the target stage

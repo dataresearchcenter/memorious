@@ -1,11 +1,12 @@
-import logging
 import os
 from fnmatch import fnmatch
 from pathlib import Path
 
+from anystore.logging import get_logger
+
 from memorious.logic.crawler import Crawler
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 class CrawlerManager(object):
@@ -17,7 +18,7 @@ class CrawlerManager(object):
     def load_path(self, path):
         path = Path(path).resolve()  # Convert to absolute path
         if not path.is_dir():
-            log.warning("Crawler config path %s not found.", path)
+            log.warning("Crawler config path not found", path=str(path))
             return
 
         for root, _, file_names in os.walk(path):
@@ -28,7 +29,7 @@ class CrawlerManager(object):
                 try:
                     crawler = Crawler(self, source_file)
                 except ValueError:
-                    log.exception("Skipping %s due to the following error", file_name)
+                    log.exception("Skipping crawler due to error", file=file_name)
                     continue
                 self.crawlers[crawler.name] = crawler
 
@@ -41,13 +42,10 @@ class CrawlerManager(object):
                     self.crawlers[crawler.name] = crawler
                     return crawler
                 except ValueError:
-                    log.exception(
-                        "Could not load crawler %s due to the following error",
-                        path.name,
-                    )
-            log.warning("Crawler path %s is not a yaml file", path)
+                    log.exception("Could not load crawler due to error", file=path.name)
+            log.warning("Crawler path is not a yaml file", path=str(path))
         else:
-            log.warning("Crawler path %s is not a valid file path", path)
+            log.warning("Crawler path is not a valid file path", path=str(path))
         return None
 
     def __getitem__(self, name):

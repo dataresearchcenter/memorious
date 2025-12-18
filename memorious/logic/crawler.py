@@ -1,9 +1,9 @@
 """Crawler orchestration and runtime management."""
 
-import logging
 from importlib import import_module
 from pathlib import Path
 
+from anystore.logging import get_logger
 from anystore.types import SDict
 from anystore.util import ensure_uuid
 from openaleph_procrastinate.manage import cancel_jobs
@@ -14,7 +14,7 @@ from servicelayer.extensions import get_entry_point
 from memorious.core import get_tags, settings
 from memorious.model import CrawlerConfig, CrawlerStage
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 class Crawler:
@@ -88,7 +88,7 @@ class Crawler:
 
     def aggregate(self, context):
         if self.aggregator_method:
-            log.info("Running aggregator for %s", self.name)
+            log.info("Running aggregator", dataset=self.name)
             params = self.config.aggregator.params if self.config.aggregator else {}
             self.aggregator_method(context, params)
 

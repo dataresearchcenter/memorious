@@ -7,11 +7,11 @@ extracting metadata, and handling pagination in web crawlers.
 from __future__ import annotations
 
 import csv
-import logging
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin
 
 import jq
+from anystore.logging import get_logger
 from anystore.util import join_relpaths as make_key
 from banal import clean_dict, ensure_dict, ensure_list
 from normality import collapse_spaces
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from memorious.logic.context import Context
     from memorious.logic.http import ContextHttpResponse
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 URL_TAGS = [
     (".", "href"),
@@ -51,7 +51,7 @@ def parse_html(
         data: Current stage data.
         result: HTTP response with parsed HTML.
     """
-    context.log.info("Parse: %r", result.url)
+    context.log.info("Parse HTML", url=result.url)
 
     for title in result.html.xpath(".//title/text()"):
         if title is not None and "title" not in data:
@@ -77,7 +77,7 @@ def parse_html(
                     url = urljoin(result.url, attr)
                     key = url
                 except Exception:
-                    log.warning("Invalid URL: %r", attr)
+                    log.warning("Invalid URL", url=attr)
                     continue
 
                 if url is None or key is None or key in seen:
@@ -270,7 +270,7 @@ def parse_listing(context: Context, data: dict[str, Any]) -> None:
 
 def _parse_html_part(context: Context, data: dict[str, Any], html: HtmlElement) -> None:
     """Parse URLs from an HTML fragment (internal helper)."""
-    context.log.info("Parse html part.")
+    context.log.info("Parse HTML part")
 
     include = context.params.get("include_paths")
     if include is None:
@@ -292,7 +292,7 @@ def _parse_html_part(context: Context, data: dict[str, Any], html: HtmlElement) 
                     url = urljoin(data["url"], attr)
                     key = url
                 except Exception:
-                    context.log.warning("Invalid URL: %r", attr)
+                    context.log.warning("Invalid URL", url=attr)
                     continue
 
                 if url is None or key is None or key in seen:
