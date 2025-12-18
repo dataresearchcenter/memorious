@@ -203,12 +203,14 @@ def test_lakehouse_default(context, mocker, httpbin_url):
     data = result.serialize()
 
     mocker.patch.object(context, "emit")
+    data["file_name"] = "test.json"
     lakehouse(context, data)
 
     # Verify file is in the default archive
     content_hash = data.get("content_hash")
     file_info = context.archive.lookup_file(content_hash)
     assert file_info is not None
+    assert file_info.name == "test.json"
     assert context.emit.call_count == 1
 
 
