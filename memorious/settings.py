@@ -43,7 +43,6 @@ class Settings(BaseSettings):
 
     # Core configuration
     base_path: Path = Field(default_factory=lambda: Path.cwd() / "data")
-    config_path: Path | None = Field(default=None)
 
     # Crawl behavior
     incremental: bool = Field(default=True)

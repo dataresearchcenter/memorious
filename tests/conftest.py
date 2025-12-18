@@ -4,8 +4,8 @@ import uuid
 import pytest
 
 from memorious.logic.context import Context
+from memorious.logic.crawler import get_crawler as load_crawler
 from memorious.logic.http import ContextHttp
-from memorious.logic.manager import CrawlerManager
 
 
 def get_crawler_dir():
@@ -14,30 +14,14 @@ def get_crawler_dir():
     return crawler_dir
 
 
-# Module-level manager singleton for tests
-_test_manager: CrawlerManager | None = None
-
-
-def get_manager():
-    global _test_manager
-    if _test_manager is None:
-        _test_manager = CrawlerManager()
-        _test_manager.load_path(get_crawler_dir())
-    return _test_manager
-
-
 @pytest.fixture(scope="module")
 def crawler_dir():
     return get_crawler_dir()
 
 
-@pytest.fixture(scope="module")
-def manager():
-    return get_manager()
-
-
 def get_crawler():
-    return get_manager().get("occrp_web_site")
+    config_file = os.path.join(get_crawler_dir(), "simple_web_scraper.yml")
+    return load_crawler(config_file)
 
 
 @pytest.fixture(scope="module")

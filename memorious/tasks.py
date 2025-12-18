@@ -6,29 +6,19 @@ The task receives the stage payload, executes the appropriate operation,
 and defers new tasks for subsequent stages.
 """
 
-from pathlib import Path
 from typing import Any
 
-from anystore.functools import weakref_cache as cache
 from anystore.logging import get_logger
-from anystore.types import Uri
 from openaleph_procrastinate.app import App, make_app
 from openaleph_procrastinate.model import DatasetJob
 from openaleph_procrastinate.tasks import task
 
-from memorious.logic.crawler import Crawler
-from memorious.logic.manager import CrawlerManager
+from memorious.logic.crawler import get_crawler
 
 log = get_logger(__name__)
 
 # Create the procrastinate app
 app: App = make_app("memorious.tasks")
-
-
-@cache
-def get_crawler(uri: Uri) -> Crawler:
-    manager = CrawlerManager()
-    return Crawler(manager, Path(uri))
 
 
 @task(app=app, retry=3)
@@ -59,9 +49,7 @@ def execute_stage(job: DatasetJob) -> None:
 
     job.log.info(f"Executing stage: `{stage_name}`", run_id=run_id)
 
-    # Load crawler - we need a manager to look it up
-    # In production, crawlers are loaded from MEMORIOUS_CONFIG_PATH
-
+    # Load crawler from config file URI
     crawler = get_crawler(payload["config_file"])
 
     stage = crawler.get(stage_name)

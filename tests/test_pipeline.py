@@ -61,14 +61,13 @@ def httpbin_auth_crawler(httpbin):
 @pytest.mark.skip()  # FIXME procrastinate test setup
 def test_pipeline_full(httpbin_crawler, output_dir):
     """Test a complete crawler pipeline: seed -> fetch -> store."""
-    from memorious.logic.manager import CrawlerManager
+    from memorious.logic.crawler import Crawler
 
     # Verify output dir is empty before running
     assert list(output_dir.glob("**/*")) == [], "Output dir should be empty before run"
 
     # Load and run crawler just like the CLI does
-    manager = CrawlerManager()
-    crawler = manager.load_crawler(httpbin_crawler)
+    crawler = Crawler(httpbin_crawler)
     assert crawler is not None
     assert crawler.name == "httpbin_test"
 
@@ -91,14 +90,13 @@ def test_pipeline_auth(httpbin_auth_crawler, auth_output_dir):
     """
     import json
 
-    from memorious.logic.manager import CrawlerManager
+    from memorious.logic.crawler import Crawler
 
     # Verify output dir is empty before running
     assert list(auth_output_dir.glob("**/*")) == [], "Output dir should be empty"
 
     # Load and run crawler
-    manager = CrawlerManager()
-    crawler = manager.load_crawler(httpbin_auth_crawler)
+    crawler = Crawler(httpbin_auth_crawler)
     assert crawler is not None
     assert crawler.name == "httpbin_auth_test"
 

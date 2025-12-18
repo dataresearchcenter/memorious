@@ -1,11 +1,11 @@
 """Crawler orchestration and runtime management."""
 
 from importlib import import_module
-from pathlib import Path
 
+from anystore.functools import weakref_cache as cache
 from anystore.logging import get_logger
-from anystore.types import SDict
-from anystore.util import ensure_uuid
+from anystore.types import SDict, Uri
+from anystore.util import ensure_uri, ensure_uuid
 from openaleph_procrastinate.manage import cancel_jobs
 from openaleph_procrastinate.settings import OpenAlephSettings
 from procrastinate.jobs import DeleteJobCondition
@@ -17,15 +17,27 @@ from memorious.model import CrawlerConfig, CrawlerStage
 log = get_logger(__name__)
 
 
+@cache
+def get_crawler(uri: Uri) -> "Crawler":
+    """Load and cache a crawler from a YAML configuration file.
+
+    Args:
+        uri: Path or URI to the crawler YAML config file.
+
+    Returns:
+        Cached Crawler instance.
+    """
+    return Crawler(uri)
+
+
 class Crawler:
     """A processing graph that constitutes a crawler.
 
     Wraps CrawlerConfig with runtime state and operations.
     """
 
-    def __init__(self, manager, source_file: str | Path):
-        self.manager = manager
-        self.source_file = Path(source_file)
+    def __init__(self, source_file: Uri):
+        self.source_file = ensure_uri(source_file)
 
         # Load and parse config using anystore's from_yaml_uri
         self.config = CrawlerConfig.from_yaml_uri(self.source_file)
@@ -102,7 +114,6 @@ class Crawler:
 
     def cancel(self):
         """Cancel all pending/running jobs for this crawler."""
-
         # cancel_jobs requires a real database, skip in testing mode
         if not OpenAlephSettings().in_memory_db:
             cancel_jobs(dataset=self.name)
@@ -114,7 +125,6 @@ class Crawler:
         This only defers the first task - external workers must be running
         to pick up and process the jobs.
         """
-
         # Cancel previous runs
         self.cancel()
 
@@ -171,7 +181,7 @@ class Crawler:
             dataset=self.name,
             stage=stage,
             run_id=run_id,
-            config_file=str(self.source_file),
+            config_file=self.source_file,
             data=data,
             incremental=incr,
             continue_on_error=coe,

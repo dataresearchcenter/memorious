@@ -41,7 +41,7 @@ typecheck:
 
 test:
 	# Check if the command works
-	poetry run memorious list
+	poetry run memorious --help
 	poetry run pytest -v --capture=sys --cov=memorious --cov-report lcov
 
 services:

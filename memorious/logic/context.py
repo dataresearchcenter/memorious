@@ -9,7 +9,7 @@ import uuid
 from copy import deepcopy
 from pathlib import Path
 from tempfile import mkdtemp
-from typing import IO, TYPE_CHECKING, Any, ContextManager
+from typing import IO, Any, ContextManager
 
 from anystore.logging import get_logger
 from anystore.store.base import BaseStore
@@ -28,10 +28,6 @@ from memorious.logic.crawler import Crawler
 from memorious.logic.http import ContextHttp
 from memorious.model.stage import CrawlerStage
 from memorious.settings import Settings
-
-if TYPE_CHECKING:
-    from memorious.logic.manager import CrawlerManager
-
 
 DEFAULT_ORIGIN = "memorious"
 CACHE_ORIGIN = "memorious-cache"
@@ -236,19 +232,18 @@ class Context:
 
     @classmethod
     def from_state(
-        cls, state: dict[str, Any], stage: str, manager: CrawlerManager
-    ) -> Context:
+        cls, state: dict[str, Any], stage: str, config_file: str
+    ) -> "Context":
         """Create a Context from serialized state.
 
         Args:
             state: Serialized state dict containing dataset name and run_id
             stage: Stage name to execute
-            manager: CrawlerManager instance to look up crawler
+            config_file: Path or URI to crawler config file
         """
-        dataset = state.get("dataset")
-        crawler = manager.get(dataset)
-        if crawler is None:
-            raise RuntimeError("Missing dataset: [%s]" % dataset)
+        from memorious.logic.crawler import get_crawler
+
+        crawler = get_crawler(config_file)
         stage_obj = crawler.get(stage)
         if stage_obj is None:
             raise RuntimeError("[%r] has no stage: %s" % (crawler, stage))

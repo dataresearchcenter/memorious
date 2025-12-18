@@ -1,19 +1,23 @@
 import os
-from collections.abc import Iterable
 
-from memorious.logic.manager import Crawler, CrawlerManager
+from memorious.logic.crawler import Crawler, get_crawler
 
 
-class TestManager(object):
-    def test_manager(self):
+class TestCrawlerLoading(object):
+    def test_load_crawler(self):
         file_path = os.path.realpath(__file__)
-        crawler_dir = os.path.normpath(os.path.join(file_path, "../testdata/config"))
-        manager = CrawlerManager()
-        assert len(manager) == 0
-        manager.load_path(crawler_dir)
-        assert isinstance(manager.crawlers, dict)
-        assert all(isinstance(crawler, Crawler) for crawler in manager)
-        assert len(manager) == 3
-        assert isinstance(manager.get("book_scraper"), Crawler)
-        assert isinstance(manager["book_scraper"], Crawler)
-        assert isinstance(manager, Iterable)
+        config_file = os.path.normpath(
+            os.path.join(file_path, "../testdata/config/simple_web_scraper.yml")
+        )
+        crawler = get_crawler(config_file)
+        assert isinstance(crawler, Crawler)
+        assert crawler.name == "occrp_web_site"
+
+    def test_crawler_cached(self):
+        file_path = os.path.realpath(__file__)
+        config_file = os.path.normpath(
+            os.path.join(file_path, "../testdata/config/simple_web_scraper.yml")
+        )
+        crawler1 = get_crawler(config_file)
+        crawler2 = get_crawler(config_file)
+        assert crawler1 is crawler2

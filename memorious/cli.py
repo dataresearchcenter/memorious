@@ -5,14 +5,12 @@ from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
-from anystore.functools import weakref_cache as cache
 from anystore.logging import get_logger
 from openaleph_procrastinate.app import run_sync_worker
 from rich.console import Console
-from rich.table import Table
 
-from memorious.core import init_memorious, settings
-from memorious.logic.manager import CrawlerManager
+from memorious.core import get_settings, init_memorious, settings
+from memorious.logic.crawler import get_crawler
 from memorious.settings import VERSION
 from memorious.tasks import app as procrastinate_app
 
@@ -22,75 +20,39 @@ console = Console(stderr=True)
 cli = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=settings.debug)
 
 
-@cache
-def get_manager() -> CrawlerManager:
-    """Get cached crawler manager."""
-    manager = CrawlerManager()
-    if settings.config_path:
-        manager.load_path(str(settings.config_path))
-    return manager
-
-
-def get_crawler_by_name(name: str):
-    """Get a crawler by name, raising an error if not found."""
-    crawler = get_manager().get(name)
-    if crawler is None:
-        console.print(f"[red]Crawler [bold]{name}[/bold] not found.[/red]")
-        raise typer.Exit(1)
-    return crawler
-
-
 @cli.callback(invoke_without_command=True)
 def main(
-    ctx: typer.Context,
     version: Annotated[
         Optional[bool], typer.Option("--version", "-v", help="Show version")
     ] = False,
-    debug: Annotated[
-        bool, typer.Option("--debug/--no-debug", envvar="MEMORIOUS_DEBUG")
+    settings: Annotated[
+        Optional[bool], typer.Option(help="Show current settings")
     ] = False,
 ):
     """Crawler framework for documents and structured scrapers."""
     if version:
         console.print(f"memorious {VERSION}")
         raise typer.Exit()
+    if settings:
+        console.print(get_settings())
+
     init_memorious()
 
 
 @cli.command("run")
 def run_crawler(
-    crawler: Annotated[str, typer.Argument(help="Crawler name to run")],
-    continue_on_error: Annotated[
-        bool,
-        typer.Option(
-            "--continue-on-error", help="Don't stop crawler execution on error"
-        ),
-    ] = False,
-    flush: Annotated[
-        bool,
-        typer.Option("--flush", help="Delete all existing data before execution"),
-    ] = False,
-):
-    """Queue a crawler for execution via procrastinate."""
-    c = get_crawler_by_name(crawler)
-    if flush:
-        c.flush()
-    c.run(continue_on_error=continue_on_error)
-    console.print(f"Crawler [bold]{c.name}[/bold] queued for execution")
-
-
-@cli.command("run-file")
-def run_file(
-    crawler_config: Annotated[
-        Path, typer.Argument(help="Path to crawler YAML config file", exists=True)
-    ],
+    uri: Annotated[str, typer.Argument(help="URI or path to crawler YAML config file")],
     src: Annotated[
-        bool,
+        Optional[Path],
         typer.Option(
             "--src",
-            help="Add src folder relative to crawler YAML to Python path",
+            help="Directory containing custom modules to add to Python path",
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            resolve_path=True,
         ),
-    ] = False,
+    ] = None,
     continue_on_error: Annotated[
         bool,
         typer.Option(
@@ -102,19 +64,14 @@ def run_file(
         typer.Option("--flush", help="Delete all existing data before execution"),
     ] = False,
 ):
-    """Queue a crawler from a YAML config file for execution."""
-    manager = CrawlerManager()
-    crawler = manager.load_crawler(crawler_config)
-    if not crawler:
-        console.print("[red]Could not load the crawler. Exiting.[/red]")
-        raise typer.Exit(1)
+    """Run a crawler from a YAML config file."""
+    crawler = get_crawler(uri)
     if src:
-        src_path = crawler_config.parent / "src"
-        sys.path.insert(0, str(src_path))
+        sys.path.insert(0, str(src))
     if flush:
         crawler.flush()
     crawler.run(continue_on_error=continue_on_error)
-    console.print(f"Crawler [bold]{crawler.name}[/bold] queued for execution")
+    console.print(f"Crawler [bold]{crawler.name}[/bold] completed")
 
 
 @cli.command("worker")
@@ -130,51 +87,22 @@ def worker(
 
 @cli.command("cancel")
 def cancel(
-    crawler: Annotated[str, typer.Argument(help="Crawler name to cancel")],
+    uri: Annotated[str, typer.Argument(help="URI or path to crawler YAML config file")],
 ):
-    """Abort execution of a specified crawler."""
-    c = get_crawler_by_name(crawler)
-    c.cancel()
-    console.print(f"Crawler [bold]{c.name}[/bold] cancelled")
+    """Cancel execution of a crawler."""
+    crawler = get_crawler(uri)
+    crawler.cancel()
+    console.print(f"Crawler [bold]{crawler.name}[/bold] cancelled")
 
 
 @cli.command("flush")
 def flush_crawler(
-    crawler: Annotated[str, typer.Argument(help="Crawler name to flush")],
+    uri: Annotated[str, typer.Argument(help="URI or path to crawler YAML config file")],
 ):
-    """Delete all data generated by a crawler."""
-    c = get_crawler_by_name(crawler)
-    c.flush()
-    console.print(f"Crawler [bold]{c.name}[/bold] data flushed")
-
-
-@cli.command("flush-tags")
-def flush_tags(
-    crawler: Annotated[str, typer.Argument(help="Crawler name")],
-):
-    """Delete all tags generated by a crawler."""
-    c = get_crawler_by_name(crawler)
-    c.flush_tags()
-    console.print(f"Crawler [bold]{c.name}[/bold] tags flushed")
-
-
-@cli.command("list")
-def list_crawlers():
-    """List the available crawlers."""
-    table = Table(title="Available Crawlers")
-    table.add_column("Name", style="cyan")
-    table.add_column("Description")
-
-    for crawler in get_manager():
-        table.add_row(crawler.name, crawler.description or "")
-
-    console.print(table)
-
-
-@cli.command("settings")
-def show_settings():
-    """Show current runtime settings."""
-    console.print(settings)
+    """Delete all data and tags generated by a crawler."""
+    crawler = get_crawler(uri)
+    crawler.flush()
+    console.print(f"Crawler [bold]{crawler.name}[/bold] data flushed")
 
 
 if __name__ == "__main__":
