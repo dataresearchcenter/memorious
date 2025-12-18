@@ -3,6 +3,8 @@ from urllib.parse import urljoin
 
 from anystore.util import join_relpaths as make_key
 
+from memorious.operations import register
+
 API_HOST = "https://api.www.documentcloud.org"
 ASSET_HOST = "https://assets.documentcloud.org"
 DOCUMENT_HOST = "https://www.documentcloud.org"
@@ -34,6 +36,7 @@ LANGUAGES = {
 }
 
 
+@register("documentcloud_query")
 def documentcloud_query(context, data):
     host = context.get("host", API_HOST)
     instance = context.get("instance", DEFAULT_INSTANCE)
@@ -104,6 +107,7 @@ def documentcloud_query(context, data):
         context.recurse(data={"page": page + 1, "query": query})
 
 
+@register("documentcloud_mark_processed")
 def documentcloud_mark_processed(context, data):
     """Create a persistent tag to indicate that a document has been fully processed
 

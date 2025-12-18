@@ -13,11 +13,13 @@ from lxml import html
 
 from memorious.exc import MetaDataError
 from memorious.helpers.casting import cast_dict
+from memorious.operations import register
 
 if TYPE_CHECKING:
     from memorious.logic.context import Context
 
 
+@register("clean_html")
 def clean_html(context: Context, data: dict[str, Any]) -> None:
     """Clean HTML by removing specified elements.
 
@@ -59,6 +61,7 @@ def clean_html(context: Context, data: dict[str, Any]) -> None:
         context.emit(data=data)
 
 
+@register("clean")
 def clean(context: Context, data: dict[str, Any]) -> None:
     """Clean and validate metadata in the data dict.
 

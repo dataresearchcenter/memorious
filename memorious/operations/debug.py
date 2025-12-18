@@ -9,10 +9,13 @@ from __future__ import annotations
 from pprint import pformat
 from typing import TYPE_CHECKING, Any
 
+from memorious.operations import register
+
 if TYPE_CHECKING:
     from memorious.logic.context import Context
 
 
+@register("inspect")
 def inspect(context: Context, data: dict[str, Any]) -> None:
     """Log the current data dict for inspection.
 
@@ -36,6 +39,7 @@ def inspect(context: Context, data: dict[str, Any]) -> None:
     context.emit(data=data, optional=True)
 
 
+@register("ipdb")
 def ipdb(context: Context, data: dict[str, Any]) -> None:
     """Drop into an interactive ipdb debugger session.
 

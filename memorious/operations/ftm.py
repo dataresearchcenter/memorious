@@ -2,6 +2,7 @@ from banal import ensure_list
 from ftmq.store.fragments import get_fragments as get_ftmstore_dataset
 from ftmq.store.fragments.settings import Settings as FtmSettings
 
+from memorious.operations import register
 from memorious.operations.aleph import get_api
 
 ORIGIN = "memorious"
@@ -18,6 +19,8 @@ def get_dataset(context, origin=ORIGIN):
     )
 
 
+@register("ftm_store")
+@register("balkhash_put")  # Legacy alias
 def ftm_store(context, data):
     """Store an entity or a list of entities to an ftm store."""
     # This is a simplistic implementation of a balkhash memorious operation.
@@ -35,6 +38,7 @@ def ftm_store(context, data):
     bulk.flush()
 
 
+@register("ftm_load_aleph")
 def ftm_load_aleph(context, data):
     """Write each entity from an ftm store to Aleph via the _bulk API."""
     api = get_api(context)

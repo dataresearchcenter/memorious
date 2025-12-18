@@ -1,11 +1,11 @@
 """Stage configuration as pydantic model."""
 
 import re
-from importlib import import_module
 from typing import Any
 
 from pydantic import BaseModel, Field
-from servicelayer.extensions import get_entry_point
+
+from memorious.operations import resolve_operation
 
 
 class StageConfig(BaseModel):
@@ -61,16 +61,7 @@ class CrawlerStage:
     @property
     def method(self):
         """Resolve and return the method callable."""
-        # method A: via a named Python entry point
-        func = get_entry_point("memorious.operations", self.method_name)
-        if func is not None:
-            return func
-        # method B: direct import from a module
-        if ":" not in self.method_name:
-            raise ValueError(f"Unknown method: {self.method_name}")
-        package, method = self.method_name.rsplit(":", 1)
-        module = import_module(package)
-        return getattr(module, method)
+        return resolve_operation(self.method_name)
 
     @property
     def namespaced_name(self) -> str:

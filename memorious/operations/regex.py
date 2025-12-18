@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING, Any
 
 from banal import clean_dict, ensure_dict, ensure_list, is_mapping
 
+from memorious.operations import register
+
 if TYPE_CHECKING:
     from memorious.logic.context import Context
 
@@ -36,6 +38,7 @@ def _extract_regex_groups(
     return {}
 
 
+@register("regex_groups")
 def regex_groups(context: Context, data: dict[str, Any]) -> None:
     """Extract named regex groups from data values.
 

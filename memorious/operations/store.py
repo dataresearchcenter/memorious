@@ -18,6 +18,7 @@ from normality import safe_filename
 from rigour.mime import normalize_mimetype
 
 from memorious.logic.incremental import mark_incremental_complete
+from memorious.operations import register
 
 if TYPE_CHECKING:
     from memorious.logic.context import Context
@@ -52,6 +53,7 @@ def _get_file_extension(file_name: str | None, mime_type: str | None) -> str:
     return "raw"
 
 
+@register("directory")
 def directory(context: Context, data: dict[str, Any]) -> None:
     """Store collected files to a local directory.
 
@@ -104,6 +106,7 @@ def directory(context: Context, data: dict[str, Any]) -> None:
             json.dump(data, fh)
 
 
+@register("lakehouse")
 def lakehouse(context: Context, data: dict[str, Any]) -> None:
     """Store collected file in the ftm-lakehouse archive.
 
@@ -166,6 +169,7 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         context.emit(data=data)
 
 
+@register("cleanup_archive")
 def cleanup_archive(context: Context, data: dict[str, Any]) -> None:
     """Remove a blob from the archive.
 
@@ -195,6 +199,7 @@ def cleanup_archive(context: Context, data: dict[str, Any]) -> None:
             context.log.warning("File deletion not supported by storage backend")
 
 
+@register("store")
 def store(context: Context, data: dict[str, Any]) -> None:
     """Store with configurable backend and incremental marking.
 

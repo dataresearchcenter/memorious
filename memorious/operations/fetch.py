@@ -18,11 +18,13 @@ from memorious.helpers.forms import extract_form
 from memorious.helpers.rule import parse_rule
 from memorious.helpers.template import render_template
 from memorious.logic.incremental import should_skip_incremental
+from memorious.operations import register
 
 if TYPE_CHECKING:
     from memorious.logic.context import Context
 
 
+@register("fetch")
 def fetch(context: Context, data: dict[str, Any]) -> None:
     """Fetch a URL via HTTP GET request.
 
@@ -164,6 +166,7 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
             context.emit_warning("Fetch fail", url=url, error=str(ce))
 
 
+@register("session")
 def session(context: Context, data: dict[str, Any]) -> None:
     """Configure HTTP session parameters for subsequent requests.
 
@@ -250,6 +253,7 @@ def _get_post_data(context: Context, data: dict[str, Any]) -> dict[str, Any]:
     return clean_dict(post_data)
 
 
+@register("post")
 def post(context: Context, data: dict[str, Any]) -> None:
     """Perform HTTP POST request with form data.
 
@@ -295,6 +299,7 @@ def post(context: Context, data: dict[str, Any]) -> None:
     context.emit(data={**data, **result.serialize()})
 
 
+@register("post_json")
 def post_json(context: Context, data: dict[str, Any]) -> None:
     """Perform HTTP POST request with JSON body.
 
@@ -338,6 +343,7 @@ def post_json(context: Context, data: dict[str, Any]) -> None:
     context.emit(data={**data, **result.serialize()})
 
 
+@register("post_form")
 def post_form(context: Context, data: dict[str, Any]) -> None:
     """Perform HTTP POST to an HTML form with its current values.
 
@@ -393,12 +399,3 @@ def post_form(context: Context, data: dict[str, Any]) -> None:
     context.log.debug("POST form request", url=url)
     post_result = context.http.post(url, data=form_data)
     context.emit(data={**data, **post_result.serialize()})
-
-
-def fetch_extended(context: Context, data: dict[str, Any]) -> None:
-    """Deprecated: Use fetch() instead.
-
-    This function is kept for backward compatibility and simply
-    delegates to fetch(), which now includes all extended features.
-    """
-    fetch(context, data)

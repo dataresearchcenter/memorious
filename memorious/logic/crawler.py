@@ -1,7 +1,5 @@
 """Crawler orchestration and runtime management."""
 
-from importlib import import_module
-
 from anystore.functools import weakref_cache as cache
 from anystore.logging import get_logger
 from anystore.types import SDict, Uri
@@ -9,10 +7,10 @@ from anystore.util import ensure_uri, ensure_uuid
 from openaleph_procrastinate.manage import cancel_jobs
 from openaleph_procrastinate.settings import OpenAlephSettings
 from procrastinate.jobs import DeleteJobCondition
-from servicelayer.extensions import get_entry_point
 
 from memorious.core import get_tags, settings
 from memorious.model import CrawlerConfig, CrawlerStage
+from memorious.operations import resolve_operation
 
 log = get_logger(__name__)
 
@@ -87,16 +85,7 @@ class Crawler:
     def aggregator_method(self):
         if not self.config.aggregator:
             return None
-
-        method = self.config.aggregator.method
-        func = get_entry_point("memorious.operations", method)
-        if func is not None:
-            return func
-        if ":" in method:
-            package, method_name = method.rsplit(":", 1)
-            module = import_module(package)
-            return getattr(module, method_name)
-        raise ValueError(f"Unknown method: {method}")
+        return resolve_operation(self.config.aggregator.method)
 
     def aggregate(self, context):
         if self.aggregator_method:

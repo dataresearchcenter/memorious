@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from banal import ensure_list
 
+from memorious.operations import register
 from memorious.util import random_filename
 
 if TYPE_CHECKING:
@@ -92,6 +93,7 @@ def _test_fname(wildcards: list[str], path: str) -> bool:
     return False
 
 
+@register("extract")
 def extract(context: Context, data: dict[str, Any]) -> None:
     """Extract files from a compressed archive.
 

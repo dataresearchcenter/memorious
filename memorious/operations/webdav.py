@@ -1,6 +1,8 @@
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlparse
 
+from memorious.operations import register
+
 
 def _get_url_file_name(url):
     path = urlparse(url).path
@@ -11,6 +13,7 @@ def _get_url_file_name(url):
     return Path(path).name
 
 
+@register("dav_index")
 def dav_index(context, data):
     """List files in a WebDAV directory."""
     # This is made to work with ownCloud/nextCloud, but some rumor has

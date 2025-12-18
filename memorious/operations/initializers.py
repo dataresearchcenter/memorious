@@ -11,10 +11,13 @@ from typing import TYPE_CHECKING, Any
 
 from banal import ensure_list
 
+from memorious.operations import register
+
 if TYPE_CHECKING:
     from memorious.logic.context import Context
 
 
+@register("seed")
 def seed(context: Context, data: dict[str, Any]) -> None:
     """Initialize a crawler with seed URLs.
 
@@ -57,6 +60,7 @@ def seed(context: Context, data: dict[str, Any]) -> None:
             context.emit(data={"url": url})
 
 
+@register("enumerate")
 def enumerate(context: Context, data: dict[str, Any]) -> None:
     """Iterate through a set of items and emit each one.
 
@@ -97,6 +101,7 @@ def enumerate(context: Context, data: dict[str, Any]) -> None:
         context.emit(data=data)
 
 
+@register("tee")
 def tee(context: Context, data: dict[str, Any]) -> None:
     """Trigger multiple subsequent stages in parallel.
 
@@ -131,6 +136,7 @@ def tee(context: Context, data: dict[str, Any]) -> None:
         context.emit(rule=rule, data=data)
 
 
+@register("sequence")
 def sequence(context: Context, data: dict[str, Any]) -> None:
     """Generate a sequence of numbers.
 
@@ -204,6 +210,7 @@ def sequence(context: Context, data: dict[str, Any]) -> None:
             break
 
 
+@register("dates")
 def dates(context: Context, data: dict[str, Any]) -> None:
     """Generate a sequence of dates.
 

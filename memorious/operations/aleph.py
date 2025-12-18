@@ -8,6 +8,7 @@ from anystore.util import join_relpaths as make_key
 from banal import clean_dict, ensure_dict, ensure_list
 
 from memorious.core import get_rate_limit
+from memorious.operations import register
 
 
 def _create_document_metadata(context, data) -> dict:
@@ -46,10 +47,12 @@ def _create_meta_object(context, data) -> dict:
     return meta
 
 
+@register("aleph_emit")
 def aleph_emit(context, data):
     aleph_emit_document(context, data)
 
 
+@register("aleph_emit_document")
 def aleph_emit_document(context, data):
     api = get_api(context)
     if api is None:
@@ -101,6 +104,7 @@ def aleph_emit_document(context, data):
                 backoff(exc, try_number)
 
 
+@register("aleph_folder")
 def aleph_folder(context, data):
     api = get_api(context)
     if api is None:
@@ -135,6 +139,7 @@ def aleph_folder(context, data):
             backoff(ae, try_number)
 
 
+@register("aleph_emit_entity")
 def aleph_emit_entity(context, data):
     api = get_api(context)
     if api is None:

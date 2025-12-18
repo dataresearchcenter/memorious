@@ -20,6 +20,7 @@ from memorious.helpers.dates import iso_date
 from memorious.helpers.pagination import paginate
 from memorious.helpers.rule import parse_rule
 from memorious.logic.incremental import should_skip_incremental
+from memorious.operations import register
 
 if TYPE_CHECKING:
     from lxml.html import HtmlElement
@@ -153,6 +154,7 @@ def parse_ftm(context: Context, data: dict[str, Any], html: HtmlElement) -> None
     data["properties"] = properties_dict
 
 
+@register("parse")
 def parse(context: Context, data: dict[str, Any]) -> None:
     """Parse HTML response and extract URLs and metadata.
 
@@ -207,6 +209,7 @@ def parse(context: Context, data: dict[str, Any]) -> None:
             context.emit(rule="store", data=data)
 
 
+@register("parse_listing")
 def parse_listing(context: Context, data: dict[str, Any]) -> None:
     """Parse HTML listing with multiple items.
 
@@ -315,6 +318,7 @@ def _parse_html_part(context: Context, data: dict[str, Any], html: HtmlElement) 
                 context.emit(rule="fetch", data=data)
 
 
+@register("parse_jq")
 def parse_jq(context: Context, data: dict[str, Any]) -> None:
     """Parse JSON response using jq patterns.
 
@@ -348,6 +352,7 @@ def parse_jq(context: Context, data: dict[str, Any]) -> None:
         context.emit(data={**data, **item})
 
 
+@register("parse_csv")
 def parse_csv(context: Context, data: dict[str, Any]) -> None:
     """Parse CSV file and emit rows.
 
@@ -392,6 +397,7 @@ def parse_csv(context: Context, data: dict[str, Any]) -> None:
             context.emit(rule="rows", data={**data, "rows": rows})
 
 
+@register("parse_xml")
 def parse_xml(context: Context, data: dict[str, Any]) -> None:
     """Parse XML response and extract metadata.
 

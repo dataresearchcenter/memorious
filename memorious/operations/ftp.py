@@ -6,11 +6,13 @@ import requests
 import requests_ftp
 
 from memorious.core import get_rate_limit
+from memorious.operations import register
 from memorious.settings import Settings
 
 settings = Settings()
 
 
+@register("ftp_fetch")
 def ftp_fetch(context, data):
     url = data.get("url")
     context.log.info("FTP fetch", url=url)

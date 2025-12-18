@@ -50,59 +50,6 @@ ftp = ["requests[security] (>=2.32.3,<3.0.0)", "PySocks == 1.7.1", "requests-ftp
 [project.scripts]
 memorious = "memorious.cli:cli"
 
-[project.entry-points."memorious.operations"]
-memorious = "memorious.cli:main"
-# Fetch operations
-fetch = "memorious.operations.fetch:fetch"
-fetch_extended = "memorious.operations.fetch:fetch_extended"
-session = "memorious.operations.fetch:session"
-post = "memorious.operations.fetch:post"
-post_json = "memorious.operations.fetch:post_json"
-post_form = "memorious.operations.fetch:post_form"
-# Parse operations
-parse = "memorious.operations.parse:parse"
-parse_listing = "memorious.operations.parse:parse_listing"
-parse_jq = "memorious.operations.parse:parse_jq"
-parse_csv = "memorious.operations.parse:parse_csv"
-parse_xml = "memorious.operations.parse:parse_xml"
-# Clean operations
-clean = "memorious.operations.clean:clean"
-clean_html = "memorious.operations.clean:clean_html"
-# Extract operations
-extract = "memorious.operations.extract:extract"
-# Regex operations
-regex_groups = "memorious.operations.regex:regex_groups"
-# Store operations
-store = "memorious.operations.store:store"
-directory = "memorious.operations.store:directory"
-lakehouse = "memorious.operations.store:lakehouse"
-cleanup_archive = "memorious.operations.store:cleanup_archive"
-# Initializer operations
-seed = "memorious.operations.initializers:seed"
-tee = "memorious.operations.initializers:tee"
-sequence = "memorious.operations.initializers:sequence"
-dates = "memorious.operations.initializers:dates"
-enumerate = "memorious.operations.initializers:enumerate"
-# Debug operations
-inspect = "memorious.operations.debug:inspect"
-ipdb = "memorious.operations.debug:ipdb"
-# WebDAV operations
-dav_index = "memorious.operations.webdav:dav_index"
-# FTP operations
-ftp_fetch = "memorious.operations.ftp:ftp_fetch"
-# DocumentCloud operations
-documentcloud_query = "memorious.operations.documentcloud:documentcloud_query"
-documentcloud_mark_processed = "memorious.operations.documentcloud:documentcloud_mark_processed"
-# Aleph operations
-aleph_emit = "memorious.operations.aleph:aleph_emit"
-aleph_emit_document = "memorious.operations.aleph:aleph_emit_document"
-aleph_folder = "memorious.operations.aleph:aleph_folder"
-aleph_emit_entity = "memorious.operations.aleph:aleph_emit_entity"
-# FTM operations
-balkhash_put = "memorious.operations.ftm:ftm_store"
-ftm_store = "memorious.operations.ftm:ftm_store"
-ftm_load_aleph = "memorious.operations.ftm:ftm_load_aleph"
-
 [project.urls]
 Homepage = "https://docs.investigraph.dev/lib/memorious"
 Documentation = "https://docs.investigraph.dev/lib/memorious"
@@ -139,7 +86,6 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest_env]
 DEBUG = 1
 TESTING = 1
-MEMORIOUS_CONFIG_PATH = "./tests/testdata/config"
 MEMORIOUS_BASE_PATH = "./tests/testdata/data"
 MEMORIOUS_TAGS_URI = "memory://"
 PROCRASTINATE_SYNC = 1
