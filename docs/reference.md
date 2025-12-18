@@ -481,21 +481,61 @@ The `data` dict is what was output from the previous stage, and what it contains
 - You can access `params` with `context.params.get('my_param')`.
 - You can also access other properties of the crawler, eg. `context.crawler.name` and `context.crawler.description`.
 
-#### The HTTP session
+#### The HTTP Client
 
-- `context.http` is a wrapper for [requests](http://docs.python-requests.org/en/master/). Use `context.http.get` (or `.post`) just like you would use requests, and benefit from Memorious database caching; session persistence; lazy evaluation; and serialization of responses between crawler operations.
-- Properties of the `ContextHTTPResponse` object:
-  - `url`
-  - `status_code`
-  - `headers`
-  - `encoding`
-  - `file_path`
-  - `content_hash`
-  - `content_type`
-  - `ok` (bool)
-  - The content as `raw`, `text`, `html`, `xml`, or `json`
-  - `retrieved_at`: the date the GET request was made.
-  - `modified_at`: from the `Last-Modified` header, provided it wasn't in the last 16 seconds.
+`context.http` is an HTTP client built on [httpx](https://www.python-httpx.org/). It provides:
+
+- Response caching with conditional requests (ETag, If-Modified-Since)
+- Session persistence across stages (cookies, headers)
+- Lazy evaluation for efficient crawling
+- Response serialization between crawler operations
+- Rate limiting per host
+
+**Methods:**
+
+```python
+context.http.get(url, **kwargs)   # HTTP GET
+context.http.post(url, **kwargs)  # HTTP POST
+context.http.rehash(data)         # Restore response from serialized data
+context.http.save()               # Persist session state
+context.http.reset()              # Clear session state
+```
+
+**Request parameters:**
+
+- `headers`: Extra HTTP headers
+- `auth`: Tuple of (username, password) for HTTP Basic auth
+- `data`: Form data for POST requests
+- `json_data`: JSON body for POST requests
+- `params`: URL query parameters
+- `lazy`: If True, defer the actual HTTP request (default: False)
+- `timeout`: Request timeout in seconds
+
+**ContextHttpResponse properties:**
+
+| Property | Description |
+|----------|-------------|
+| `url` | Final URL after redirects |
+| `status_code` | HTTP status code |
+| `headers` | Response headers (case-insensitive) |
+| `encoding` | Content encoding (auto-detected) |
+| `content_hash` | SHA1 hash of response body |
+| `content_type` | Normalized MIME type |
+| `file_name` | Filename from Content-Disposition header |
+| `ok` | True if status_code < 400 |
+| `raw` | Response body as bytes |
+| `text` | Response body as string |
+| `html` | Parsed lxml HTML tree |
+| `xml` | Parsed lxml XML tree |
+| `json` | Parsed JSON |
+| `retrieved_at` | ISO timestamp when fetched |
+| `last_modified` | From Last-Modified header |
+
+**Response methods:**
+
+- `local_path()`: Context manager providing content as a local file path
+- `serialize()`: Convert to dict for passing between stages
+- `close()`: Close the underlying connection
 
 #### Data validation
 
