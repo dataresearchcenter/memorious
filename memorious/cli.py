@@ -1,7 +1,5 @@
 """Memorious CLI - command line interface for crawler management."""
 
-import sys
-from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
@@ -42,17 +40,6 @@ def main(
 @cli.command("run")
 def run_crawler(
     uri: Annotated[str, typer.Argument(help="URI or path to crawler YAML config file")],
-    src: Annotated[
-        Optional[Path],
-        typer.Option(
-            "--src",
-            help="Directory containing custom modules to add to Python path",
-            exists=True,
-            file_okay=False,
-            dir_okay=True,
-            resolve_path=True,
-        ),
-    ] = None,
     continue_on_error: Annotated[
         bool,
         typer.Option(
@@ -66,8 +53,6 @@ def run_crawler(
 ):
     """Run a crawler from a YAML config file."""
     crawler = get_crawler(uri)
-    if src:
-        sys.path.insert(0, str(src))
     if flush:
         crawler.flush()
     crawler.run(continue_on_error=continue_on_error)

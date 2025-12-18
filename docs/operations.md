@@ -93,6 +93,7 @@ pipeline:
 Create a Python function that receives a context and data dict:
 
 ```python
+# src/ops.py
 def my_operation(context, data):
     """Process data and emit results."""
     url = data.get("url")
@@ -102,13 +103,17 @@ def my_operation(context, data):
     context.emit(data=result)
 ```
 
-Reference with `module:function` syntax:
+Reference with file path or module syntax:
 
 ```yaml
 process:
-  method: mypackage.ops:my_operation
+  # File path syntax (no installation needed)
+  method: ./src/ops.py:my_operation
   params:
     my_param: value
+
+  # Or module syntax (requires package installation)
+  # method: mypackage.ops:my_operation
 ```
 
 ### The Context Object

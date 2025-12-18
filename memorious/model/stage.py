@@ -3,6 +3,7 @@
 import re
 from typing import Any
 
+from anystore.util import path_from_uri
 from pydantic import BaseModel, Field
 
 from memorious.operations import resolve_operation
@@ -61,7 +62,9 @@ class CrawlerStage:
     @property
     def method(self):
         """Resolve and return the method callable."""
-        return resolve_operation(self.method_name)
+        # Get base path from crawler's source file for relative imports
+        base_path = path_from_uri(self.crawler.source_file).parent
+        return resolve_operation(self.method_name, base_path)
 
     @property
     def namespaced_name(self) -> str:

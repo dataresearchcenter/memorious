@@ -38,6 +38,23 @@ pip install memorious[ftp]
 memorious --version
 ```
 
+## Running a Crawler
+
+Crawlers are defined in YAML files. Run a crawler with:
+
+```bash
+memorious run my_crawler.yml
+```
+
+Custom operations can be referenced directly by file path - no extra installation required:
+
+```yaml
+# my_crawler.yml
+pipeline:
+  process:
+    method: ./src/my_ops.py:process_data
+```
+
 ## Environment Setup
 
 Memorious is configured via environment variables. Create a `.env` file or export them:

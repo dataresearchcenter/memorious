@@ -3,7 +3,7 @@
 from anystore.functools import weakref_cache as cache
 from anystore.logging import get_logger
 from anystore.types import SDict, Uri
-from anystore.util import ensure_uri, ensure_uuid
+from anystore.util import ensure_uri, ensure_uuid, path_from_uri
 from openaleph_procrastinate.manage import cancel_jobs
 from openaleph_procrastinate.settings import OpenAlephSettings
 from procrastinate.jobs import DeleteJobCondition
@@ -85,7 +85,8 @@ class Crawler:
     def aggregator_method(self):
         if not self.config.aggregator:
             return None
-        return resolve_operation(self.config.aggregator.method)
+        base_path = path_from_uri(self.source_file).parent
+        return resolve_operation(self.config.aggregator.method, base_path)
 
     def aggregate(self, context):
         if self.aggregator_method:
