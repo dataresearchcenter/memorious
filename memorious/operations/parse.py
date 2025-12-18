@@ -1,9 +1,9 @@
 import logging
 from urllib.parse import urljoin
 
+from anystore.util import join_relpaths as make_key
 from banal import ensure_list
 from normality import collapse_spaces
-from servicelayer.cache import make_key
 
 from memorious.helpers.dates import iso_date
 from memorious.helpers.rule import Rule

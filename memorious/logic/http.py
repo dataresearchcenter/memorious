@@ -13,12 +13,11 @@ from typing import TYPE_CHECKING, Any, ContextManager
 from urllib.parse import unquote, urlparse, urlsplit
 
 import httpx
-from anystore.util import join_relpaths
+from anystore.util import join_relpaths as make_key
 from banal import hash_data, is_mapping
 from lxml import etree, html
 from normality import guess_file_encoding, stringify
 from rigour.mime import normalize_mimetype, parse_mimetype
-from servicelayer.cache import make_key
 
 from memorious.core import get_rate_limit, settings
 from memorious.exc import ParseError
@@ -294,7 +293,7 @@ class ContextHttpResponse:
                 parts.append(hash_data(url_parts.query))
             if self.request.content:
                 parts.append(hash_data(self.request.content))
-            return join_relpaths(*parts)
+            return make_key(*parts)
         return None
 
     @property

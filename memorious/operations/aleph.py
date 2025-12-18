@@ -4,8 +4,8 @@ from alephclient import settings
 from alephclient.api import AlephAPI
 from alephclient.errors import AlephException
 from alephclient.util import backoff
+from anystore.util import join_relpaths as make_key
 from banal import clean_dict, ensure_dict, ensure_list
-from servicelayer.cache import make_key
 
 from memorious.core import get_rate_limit
 

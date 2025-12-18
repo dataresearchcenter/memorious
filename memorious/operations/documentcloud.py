@@ -1,7 +1,7 @@
 from datetime import datetime
 from urllib.parse import urljoin
 
-from servicelayer.cache import make_key
+from anystore.util import join_relpaths as make_key
 
 API_HOST = "https://api.www.documentcloud.org"
 ASSET_HOST = "https://assets.documentcloud.org"

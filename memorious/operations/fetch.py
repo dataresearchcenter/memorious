@@ -1,7 +1,7 @@
 from urllib.parse import urlparse
 
 import httpx
-from servicelayer.cache import make_key
+from anystore.util import join_relpaths as make_key
 
 from memorious.helpers.rule import Rule
 
