@@ -382,13 +382,78 @@ The method requires the content hash of the stored file as the value for the `co
 
 ### Rules
 
-You can configure rules per stage to tell certain methods which inputs to process or skip. You can nest them, and apply `not`, `and` and `or` for the combinations you desire.
+Rules filter HTTP responses based on URL, content type, or document structure. Configure rules in stage `params` to control which responses are processed.
 
-- `mime_type`: Match the MIME type string.
-- `mime_group`: See [mime.py](https://github.com/alephdata/memorious/blob/master/memorious/logic/mime.py) for handy MIME type groupings (`web`, `images`, `media`, `documents`, `archives` and `assets`).
-- `domain`: URL contains this domain.
-- `pattern`: URL matches this regex.
-- `xpath`: Document contains markup that matches this xpath
+#### Rule Types
+
+| Rule | Description | Example Value |
+|------|-------------|---------------|
+| `domain` | Match URLs from a domain (including subdomains) | `example.com` |
+| `pattern` | Match URL against a regex pattern | `.*\.pdf$` |
+| `mime_type` | Match exact MIME type | `application/pdf` |
+| `mime_group` | Match MIME type group | `documents` |
+| `xpath` | Match if XPath finds elements | `//div[@class="article"]` |
+| `match_all` | Always matches (default) | `{}` |
+
+Available MIME groups: `web`, `images`, `media`, `documents`, `archives`, `assets`.
+
+#### Boolean Operators
+
+Combine rules using `and`, `or`, and `not`:
+
+```yaml
+# Match PDFs from example.com
+rules:
+  and:
+    - domain: example.com
+    - mime_type: application/pdf
+```
+
+```yaml
+# Match documents but not images
+rules:
+  and:
+    - mime_group: documents
+    - not:
+        mime_group: images
+```
+
+```yaml
+# Match either domain
+rules:
+  or:
+    - domain: example.com
+    - domain: example.org
+```
+
+#### Complex Example
+
+```yaml
+parse:
+  method: parse
+  params:
+    rules:
+      and:
+        - domain: dataresearchcenter.org
+        - not:
+            or:
+              - domain: vis.dataresearchcenter.org
+              - domain: data.dataresearchcenter.org
+              - mime_group: images
+              - pattern: ".*/about.*"
+    store:
+      mime_group: documents
+  handle:
+    fetch: fetch
+    store: store
+```
+
+This configuration:
+
+1. Only processes URLs from `dataresearchcenter.org`
+2. Excludes `vis.dataresearchcenter.org` and `data.dataresearchcenter.org` subdomains
+3. Excludes images and about pages
+4. Stores only documents
 
 ## Extending
 

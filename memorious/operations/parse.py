@@ -18,7 +18,7 @@ from normality import collapse_spaces
 
 from memorious.helpers.dates import iso_date
 from memorious.helpers.pagination import paginate
-from memorious.helpers.rule import Rule
+from memorious.helpers.rule import parse_rule
 from memorious.logic.incremental import should_skip_incremental
 
 if TYPE_CHECKING:
@@ -203,7 +203,7 @@ def parse(context: Context, data: dict[str, Any]) -> None:
             parse_html(context, data, result)
 
         rules = context.params.get("store") or {"match_all": {}}
-        if Rule.get_rule(rules).apply(result):
+        if parse_rule(rules).apply(result):
             context.emit(rule="store", data=data)
 
 
@@ -264,7 +264,7 @@ def parse_listing(context: Context, data: dict[str, Any]) -> None:
 
             paginate(context, data, result.html)
             rules = context.params.get("store") or {"match_all": {}}
-            if Rule.get_rule(rules).apply(result):
+            if parse_rule(rules).apply(result):
                 context.emit(rule="store", data=data)
 
 

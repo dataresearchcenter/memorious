@@ -1300,7 +1300,7 @@ def show_settings():
 ### Phase 6: Additional Refactoring ✅ COMPLETE (httpx migration)
 - [ ] Reorganize package structure (deferred)
 - [ ] Create operations registry (deferred)
-- [ ] Convert rules to pydantic (deferred)
+- [x] Convert rules to pydantic
 - [x] Migrate HTTP client to httpx (see 6.2)
   - [x] Add `httpx` dependency
   - [x] Create `memorious/model/session.py` with `SessionModel`
@@ -1972,23 +1972,24 @@ jinja2 = ">=3.0"
 
 ### 8.11 Migration Checklist
 
-- [ ] Create `memorious/helpers/yaml.py`
-- [ ] Add exceptions to `memorious/exc.py`
-- [ ] Create `memorious/helpers/template.py`
-- [ ] Create `memorious/helpers/xpath.py`
-- [ ] Create `memorious/helpers/casting.py`
-- [ ] Create `memorious/helpers/regex.py`
-- [ ] Extend `memorious/helpers/dates.py`
-- [ ] Create `memorious/helpers/forms.py`
-- [ ] Create `memorious/helpers/pagination.py`
-- [ ] Create `memorious/logic/incremental.py`
-- [ ] Extend `memorious/operations/fetch.py`
-- [ ] Extend `memorious/operations/parse.py`
-- [ ] Replace `memorious/operations/clean.py`
-- [ ] Extend `memorious/operations/extract.py`
-- [ ] Extend `memorious/operations/store.py`
-- [ ] Extend `memorious/operations/debug.py`
-- [ ] Update entry points in `pyproject.toml`
-- [ ] Add dependencies (jq, furl, jinja2)
-- [ ] Remove `memorious_extended/` directory
-- [ ] Update tests
+- [x] Create `memorious/helpers/yaml.py`
+- [x] Add exceptions to `memorious/exc.py`
+- [x] Create `memorious/helpers/template.py`
+- [x] Create `memorious/helpers/xpath.py`
+- [x] Create `memorious/helpers/casting.py`
+- [x] Create `memorious/helpers/regex.py`
+- [ ] Extend `memorious/helpers/dates.py` (SKIPPED - using casting.py ensure_date)
+- [x] Create `memorious/helpers/forms.py`
+- [x] Create `memorious/helpers/pagination.py`
+- [x] Create `memorious/logic/incremental.py`
+- [x] Extend `memorious/operations/fetch.py`
+- [x] Extend `memorious/operations/parse.py`
+- [x] Replace `memorious/operations/clean.py`
+- [x] Extend `memorious/operations/extract.py`
+- [x] Extend `memorious/operations/store.py`
+- [x] Extend `memorious/operations/debug.py`
+- [x] Update entry points in `pyproject.toml`
+- [x] Add dependencies (jq, furl, jinja2)
+- [ ] Remove `memorious_extended/` directory (left for reference)
+- [x] All 52 tests pass
+- [x] Create `docs/reference/operations.md` with mkdocstrings

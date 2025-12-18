@@ -15,7 +15,7 @@ from banal import clean_dict, ensure_dict
 from furl import furl
 
 from memorious.helpers.forms import extract_form
-from memorious.helpers.rule import Rule
+from memorious.helpers.rule import parse_rule
 from memorious.helpers.template import render_template
 from memorious.logic.incremental import should_skip_incremental
 
@@ -136,7 +136,7 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
     try:
         result = context.http.get(url, lazy=True)
         rules = context.get("rules", {"match_all": {}})
-        if not Rule.get_rule(rules).apply(result):
+        if not parse_rule(rules).apply(result):
             context.log.info("Fetch skip: %r" % result.url)
             return
 
