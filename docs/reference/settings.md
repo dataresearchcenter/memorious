@@ -14,7 +14,7 @@ Memorious supports [Docker secrets](https://docs.docker.com/engine/swarm/secrets
 
 Docker secrets are mounted as files in `/run/secrets/`. Memorious reads these files automatically, using the filename (with `memorious_` prefix) as the setting name.
 
-### Example: Database URI Secret
+### Example: Tags URI Secret
 
 Create the secret:
 
@@ -43,15 +43,6 @@ secrets:
     # external: true
 ```
 
-### Supported Secrets
-
-Any Memorious setting can be provided as a Docker secret. Common use cases:
-
-| Secret File | Setting |
-|-------------|---------|
-| `/run/secrets/memorious_tags_uri` | Database connection string |
-| `/run/secrets/memorious_http_timeout` | HTTP timeout value |
-
 ### Priority
 
 Environment variables take precedence over Docker secrets. This allows you to override secrets in specific deployments while keeping the base configuration secure.
@@ -62,10 +53,9 @@ Environment variables take precedence over Docker secrets. This allows you to ov
 
 | Environment Variable | Type | Default | Description |
 |---------------------|------|---------|-------------|
-| `MEMORIOUS_APP_NAME` | `str` | `"memorious"` | Application name identifier |
-| `MEMORIOUS_DEBUG` | `bool` | `false` | Enable debug mode with verbose logging and single-threaded execution |
-| `MEMORIOUS_TESTING` | `bool` | `false` | Enable testing mode (uses FakeRedis instead of real Redis) |
-| `MEMORIOUS_BASE_PATH` | `Path` | `./data` | Base directory for all data storage (archive, tags database, etc.) |
+| `MEMORIOUS_DEBUG` | `bool` | `false` | Enable debug mode with verbose logging |
+| `MEMORIOUS_TESTING` | `bool` | `false` | Enable testing mode |
+| `MEMORIOUS_BASE_PATH` | `Path` | `./data` | Base directory for all data storage |
 | `MEMORIOUS_CONFIG_PATH` | `Path` | `None` | Path to directory containing crawler YAML configuration files |
 
 ### Crawl Behavior
@@ -74,15 +64,13 @@ Environment variables take precedence over Docker secrets. This allows you to ov
 |---------------------|------|---------|-------------|
 | `MEMORIOUS_INCREMENTAL` | `bool` | `true` | Enable incremental crawling (skip previously crawled items within expiry window) |
 | `MEMORIOUS_CONTINUE_ON_ERROR` | `bool` | `false` | Continue crawler execution when an error occurs instead of stopping |
-| `MEMORIOUS_EXPIRE` | `int` | `1` | Number of days until cached/incremental crawl data expires |
+| `MEMORIOUS_EXPIRE` | `int` | `1` | Number of days until incremental crawl data expires |
 
 ### Rate Limiting
 
 | Environment Variable | Type | Default | Description |
 |---------------------|------|---------|-------------|
-| `MEMORIOUS_DB_RATE_LIMIT` | `int` | `6000` | Maximum database operations per minute |
 | `MEMORIOUS_HTTP_RATE_LIMIT` | `int` | `120` | Maximum HTTP requests to a single host per minute |
-| `MEMORIOUS_MAX_QUEUE_LENGTH` | `int` | `50000` | Maximum number of pending tasks in the queue before raising an error |
 
 ### HTTP Configuration
 
@@ -90,62 +78,67 @@ Environment variables take precedence over Docker secrets. This allows you to ov
 |---------------------|------|---------|-------------|
 | `MEMORIOUS_HTTP_CACHE` | `bool` | `true` | Enable HTTP response caching |
 | `MEMORIOUS_HTTP_TIMEOUT` | `float` | `30.0` | HTTP request timeout in seconds |
-| `MEMORIOUS_USER_AGENT` | `str` | `Mozilla/5.0 ... aleph.memorious/{VERSION}` | User-Agent header for HTTP requests |
+| `MEMORIOUS_USER_AGENT` | `str` | `Mozilla/5.0 ... memorious/{VERSION}` | User-Agent header for HTTP requests |
 
-### Tags Storage
-
-Tags are used for incremental crawling state and HTTP response caching.
+### Storage Configuration
 
 | Environment Variable | Type | Default | Description |
 |---------------------|------|---------|-------------|
-| `MEMORIOUS_TAGS_URI` | `str` | `None` | Database URI for tags storage. Supports SQLite and PostgreSQL. Defaults to `sqlite:///{BASE_PATH}/tags.sqlite3` |
-| `MEMORIOUS_TAGS_TABLE` | `str` | `"memorious_tags"` | Database table name for storing tags |
+| `MEMORIOUS_CACHE_URI` | `str` | `memory://` | URI for runtime cache (HTTP sessions). Supports `memory://`, `redis://`, file paths |
+| `MEMORIOUS_TAGS_URI` | `str` | `None` | URI for tags storage (incremental state). Defaults to archive-based storage |
 
 **Examples:**
 
 ```bash
-# SQLite (default)
+# In-memory cache (default, good for single-process)
+MEMORIOUS_CACHE_URI=memory://
+
+# Redis cache (required for multi-worker deployments)
+MEMORIOUS_CACHE_URI=redis://localhost:6379/0
+
+# SQLite tags
 MEMORIOUS_TAGS_URI=sqlite:///./data/tags.sqlite3
 
-# PostgreSQL
+# PostgreSQL tags
 MEMORIOUS_TAGS_URI=postgresql://user:pass@localhost/memorious
 ```
 
-## Servicelayer Settings
+## Job Queue (Procrastinate)
 
-Memorious uses [servicelayer](https://github.com/alephdata/servicelayer) for file archiving and Redis connectivity. These are configured via separate environment variables (no `MEMORIOUS_` prefix):
-
-### Archive Storage
+Memorious uses [openaleph-procrastinate](https://github.com/openaleph/openaleph-procrastinate) for job queue management. Configure via these environment variables (no `MEMORIOUS_` prefix):
 
 | Environment Variable | Type | Default | Description |
 |---------------------|------|---------|-------------|
-| `ARCHIVE_TYPE` | `str` | `"file"` | Storage backend type: `file`, `s3`, or `gs` |
-| `ARCHIVE_PATH` | `str` | `None` | Local directory for file storage (auto-set from `MEMORIOUS_BASE_PATH/archive` if not specified) |
-| `ARCHIVE_BUCKET` | `str` | `None` | S3/GCS bucket name (required if `ARCHIVE_TYPE` is `s3` or `gs`) |
-| `PUBLICATION_BUCKET` | `str` | `None` | Separate bucket for published/public files |
-
-### AWS S3 (when `ARCHIVE_TYPE=s3`)
-
-| Environment Variable | Description |
-|---------------------|-------------|
-| `AWS_ACCESS_KEY_ID` | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key |
-| `AWS_REGION` | AWS region (e.g., `us-east-1`) |
-
-### Redis
-
-| Environment Variable | Type | Default | Description |
-|---------------------|------|---------|-------------|
-| `REDIS_URL` | `str` | `None` | Redis connection URL. If not set, uses FakeRedis (single-threaded mode) |
+| `PROCRASTINATE_DB_URI` | `str` | `memory:` | Database URI for job queue. Use `memory:` for testing, PostgreSQL for production |
+| `PROCRASTINATE_SYNC` | `bool` | `false` | Enable synchronous execution (useful for testing) |
 
 **Examples:**
 
 ```bash
-# Local Redis
-REDIS_URL=redis://localhost:6379/0
+# In-memory (testing only)
+PROCRASTINATE_DB_URI=memory:
+PROCRASTINATE_SYNC=1
 
-# Redis with authentication
-REDIS_URL=redis://:password@localhost:6379/0
+# PostgreSQL (production)
+PROCRASTINATE_DB_URI=postgresql://user:pass@localhost/memorious
+```
+
+## Archive Storage (ftm-lakehouse)
+
+File storage is handled by [ftm-lakehouse](https://github.com/openaleph/ftm-lakehouse). Configure via:
+
+| Environment Variable | Type | Default | Description |
+|---------------------|------|---------|-------------|
+| `LAKEHOUSE_URI` | `str` | `data` | Base URI for archive storage. Can be local path or cloud storage URI |
+
+**Examples:**
+
+```bash
+# Local storage
+LAKEHOUSE_URI=./data
+
+# S3 storage
+LAKEHOUSE_URI=s3://my-bucket/memorious
 ```
 
 ## FTM Store Settings
@@ -167,15 +160,20 @@ When using Aleph operations (`aleph_emit_document`, `aleph_emit_entity`), config
 
 ## Example Configuration
 
-### Development (SQLite, no Redis)
+### Development (In-Memory, Single Process)
 
 ```bash
 export MEMORIOUS_DEBUG=true
 export MEMORIOUS_BASE_PATH=./data
 export MEMORIOUS_CONFIG_PATH=./config
+
+# Use in-memory for everything (default)
+export MEMORIOUS_CACHE_URI=memory://
+export PROCRASTINATE_DB_URI=memory:
+export PROCRASTINATE_SYNC=1
 ```
 
-### Production (PostgreSQL, Redis, S3)
+### Production (PostgreSQL, Redis)
 
 ```bash
 # Core
@@ -183,18 +181,17 @@ export MEMORIOUS_BASE_PATH=/var/lib/memorious
 export MEMORIOUS_CONFIG_PATH=/etc/memorious/config
 export MEMORIOUS_DEBUG=false
 
-# Tags database
+# Runtime cache (Redis for multi-worker)
+export MEMORIOUS_CACHE_URI=redis://redis:6379/0
+
+# Tags storage
 export MEMORIOUS_TAGS_URI=postgresql://memorious:secret@db:5432/memorious
 
-# Redis for task queue
-export REDIS_URL=redis://redis:6379/0
+# Job queue
+export PROCRASTINATE_DB_URI=postgresql://memorious:secret@db:5432/memorious
 
-# S3 for file storage
-export ARCHIVE_TYPE=s3
-export ARCHIVE_BUCKET=my-memorious-archive
-export AWS_ACCESS_KEY_ID=AKIA...
-export AWS_SECRET_ACCESS_KEY=...
-export AWS_REGION=eu-west-1
+# Archive storage
+export LAKEHOUSE_URI=s3://my-bucket/memorious
 
 # FTM store
 export FTM_STORE_URI=postgresql://memorious:secret@db:5432/memorious
@@ -209,12 +206,50 @@ export ALEPH_API_KEY=abc123...
 ```yaml
 services:
   memorious:
+    image: ghcr.io/dataresearchcenter/memorious:latest
     environment:
       MEMORIOUS_CONFIG_PATH: /config
       MEMORIOUS_BASE_PATH: /data
+      MEMORIOUS_CACHE_URI: redis://redis:6379/0
       MEMORIOUS_TAGS_URI: postgresql://user:pass@postgres/memorious
-      REDIS_URL: redis://redis:6379/0
+      PROCRASTINATE_DB_URI: postgresql://user:pass@postgres/memorious
+      LAKEHOUSE_URI: /data/archive
       FTM_STORE_URI: postgresql://user:pass@postgres/memorious
+    volumes:
+      - ./config:/config:ro
+      - ./data:/data
+    depends_on:
+      - postgres
+      - redis
+
+  worker:
+    image: ghcr.io/dataresearchcenter/memorious:latest
+    command: memorious worker --concurrency 4
+    environment:
+      MEMORIOUS_CACHE_URI: redis://redis:6379/0
+      MEMORIOUS_TAGS_URI: postgresql://user:pass@postgres/memorious
+      PROCRASTINATE_DB_URI: postgresql://user:pass@postgres/memorious
+      LAKEHOUSE_URI: /data/archive
+    volumes:
+      - ./data:/data
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: memorious
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+
+volumes:
+  postgres_data:
 ```
 
 ## Crawler-Level Overrides

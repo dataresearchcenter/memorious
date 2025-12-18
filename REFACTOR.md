@@ -41,7 +41,7 @@ memorious/
 │   └── http.py          # ✅ httpx-based HTTP client with SessionModel persistence
 ├── operations/          # ✅ Built-in stage methods (updated for httpx)
 ├── helpers/             # Utility functions (unchanged)
-└── cli.py               # Click CLI (Phase 7 will migrate to Typer)
+└── cli.py               # ✅ Typer CLI with rich output
 ```
 
 ---
@@ -1297,27 +1297,35 @@ def show_settings():
 - [x] Update tests
 - [x] Add lakehouse() operation with custom URI support
 
-### Phase 6: Additional Refactoring ✅ PARTIAL
-- [ ] Reorganize package structure
-- [ ] Create operations registry
-- [ ] Convert rules to pydantic
+### Phase 6: Additional Refactoring ✅ COMPLETE (httpx migration)
+- [ ] Reorganize package structure (deferred)
+- [ ] Create operations registry (deferred)
+- [ ] Convert rules to pydantic (deferred)
 - [x] Migrate HTTP client to httpx (see 6.2)
   - [x] Add `httpx` dependency
   - [x] Create `memorious/model/session.py` with `SessionModel`
   - [x] Refactor `ContextHttp` to use `httpx.Client` with lazy `@property`
   - [x] Refactor `ContextHttpResponse` for httpx API
-  - [x] Update session persistence to use `model=SessionModel`
+  - [x] Update session persistence to use `model=SessionModel` with `auth_header` field
   - [x] Move `requests` to optional `[ftp]` dependency (needed for requests-ftp)
   - [x] Update `operations/fetch.py` and `operations/parse.py` to use `context.http.client`
   - [x] Update `operations/store.py` to use `httpx.Headers` instead of `CaseInsensitiveDict`
-  - [x] Update all tests
-- [ ] Update tests for other changes
+  - [x] Add `get_cache()` to `core.py` for shared session cache across stages
+  - [x] Add `test_basic_auth_pipeline` integration test for session persistence
+  - [x] Add `TestSessionModel` unit tests for serialization roundtrip
+  - [x] Update all tests (52 passed, 1 skipped)
 
-### Phase 7: CLI & Documentation
-- [ ] Migrate CLI from Click to Typer
-- [ ] Update CLAUDE.md
-- [ ] Update README
-- [ ] Update documentation
+### Phase 7: CLI & Documentation ✅ COMPLETE
+- [x] Migrate CLI from Click to Typer
+  - [x] Replace `click` with `typer` and `rich` dependencies
+  - [x] Rewrite `memorious/cli.py` using Typer patterns (Annotated types, rich console)
+  - [x] Use `rich.table.Table` for list command output
+  - [x] Add `settings` command to show runtime config
+  - [x] Update entry point to `memorious.cli:cli`
+  - [x] Remove `tabulate` dependency
+- [x] Update CLAUDE.md with refactored architecture
+- [x] Update mkdocs.yml for mkdocs-typer2 plugin
+- [ ] Update README (kept as-is, generic enough)
 
 ---
 
