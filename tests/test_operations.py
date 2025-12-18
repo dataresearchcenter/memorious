@@ -72,10 +72,16 @@ def test_parse(context, mocker, httpbin_url):
     context.http.result = None
     context.params["store"] = None
     parse(context, data)
-    assert data["url"] == "https://iana.org/domains/example"
+    # Check emitted data (parse no longer mutates input data)
+    # Find the fetch emit (last one with rule="fetch")
+    fetch_calls = [
+        c for c in context.emit.call_args_list if c.kwargs.get("rule") == "fetch"
+    ]
+    emitted_data = fetch_calls[-1].kwargs["data"]
+    assert emitted_data["url"] == "https://iana.org/domains/example"
     assert data["title"] == "Example Domain"
     assert data["description"].startswith("This domain is for")
-    assert context.emit.call_count == 3, data
+    assert context.emit.call_count == 3
 
 
 def test_parse_ftm(context, mocker):

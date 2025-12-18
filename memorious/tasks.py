@@ -47,8 +47,6 @@ def execute_stage(job: DatasetJob) -> None:
     stage_name = payload["stage"]
     run_id = payload["run_id"]
 
-    job.log.info(f"Executing stage: `{stage_name}`", run_id=run_id)
-
     # Load crawler from config file URI
     crawler = get_crawler(payload["config_file"])
 

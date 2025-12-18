@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import csv
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 import jq
 from anystore.logging import get_logger
@@ -21,12 +21,12 @@ from memorious.helpers.pagination import paginate
 from memorious.helpers.rule import parse_rule
 from memorious.logic.incremental import should_skip_incremental
 from memorious.operations import register
+from memorious.util import make_url_key
 
 if TYPE_CHECKING:
     from lxml.html import HtmlElement
 
     from memorious.logic.context import Context
-    from memorious.logic.http import ContextHttpResponse
 
 log = get_logger(__name__)
 
@@ -39,32 +39,27 @@ URL_TAGS = [
 ]
 
 
-def parse_html(
-    context: Context, data: dict[str, Any], result: ContextHttpResponse
+def _extract_urls(
+    context: Context,
+    data: dict[str, Any],
+    html: HtmlElement,
+    base_url: str,
 ) -> None:
-    """Parse HTML and emit URLs found in the document.
-
-    Internal function that extracts URLs from HTML elements based on
-    include_paths configuration.
+    """Extract URLs from HTML and emit them for fetching.
 
     Args:
         context: The crawler context.
         data: Current stage data.
-        result: HTTP response with parsed HTML.
+        html: HTML element to extract URLs from.
+        base_url: Base URL for resolving relative links.
     """
-    context.log.info("Parse HTML", url=result.url)
-
-    for title in result.html.xpath(".//title/text()"):
-        if title is not None and "title" not in data:
-            data["title"] = title
-
     include = context.params.get("include_paths")
     if include is None:
-        roots = [result.html]
+        roots = [html]
     else:
         roots = []
         for path in include:
-            roots = roots + result.html.xpath(path)
+            roots = roots + html.xpath(path)
 
     seen = set()
     for root in roots:
@@ -75,34 +70,36 @@ def parse_html(
                     continue
 
                 try:
-                    url = urljoin(result.url, attr)
-                    key = url
+                    url = urljoin(base_url, attr)
                 except Exception:
                     log.warning("Invalid URL", url=attr)
                     continue
 
-                if url is None or key is None or key in seen:
+                if url is None or url in seen:
                     continue
-                seen.add(key)
+                seen.add(url)
 
-                tag = make_key(context.run_id, key)
+                tag = make_key(context.run_id, make_url_key(url))
                 if context.check_tag(tag):
                     continue
                 context.set_tag(tag, None)
-                data["url"] = url
 
-                if data.get("title") is None:
-                    # Option to set the document title from the link text.
+                emit_data = {**data, "url": url}
+
+                if emit_data.get("title") is None:
                     if context.get("link_title", False):
-                        data["title"] = collapse_spaces(element.text_content())
+                        emit_data["title"] = collapse_spaces(element.text_content())
                     elif element.get("title"):
-                        data["title"] = collapse_spaces(element.get("title"))
+                        emit_data["title"] = collapse_spaces(element.get("title"))
 
-                context.http.client.headers["Referer"] = url
-                context.emit(rule="fetch", data=data)
+                # Encode non-ASCII characters for HTTP header
+                context.http.client.headers["Referer"] = quote(
+                    url, safe=":/?#[]@!$&'()*+,;="
+                )
+                context.emit(rule="fetch", data=emit_data)
 
 
-def parse_for_metadata(
+def _extract_metadata(
     context: Context, data: dict[str, Any], html: HtmlElement
 ) -> dict[str, Any]:
     """Extract metadata from HTML/XML using XPath expressions.
@@ -118,8 +115,7 @@ def parse_for_metadata(
     meta = context.params.get("meta", {})
     meta_date = context.params.get("meta_date", {})
 
-    meta_paths = meta
-    meta_paths.update(meta_date)
+    meta_paths = {**meta, **meta_date}
 
     for key, xpaths in meta_paths.items():
         for xpath in ensure_list(xpaths):
@@ -127,7 +123,6 @@ def parse_for_metadata(
                 try:
                     value = collapse_spaces(element.text_content())
                 except AttributeError:
-                    # useful when element is an attribute
                     value = collapse_spaces(str(element))
                 if key in meta_date:
                     value = iso_date(value)
@@ -137,7 +132,7 @@ def parse_for_metadata(
     return data
 
 
-def parse_ftm(context: Context, data: dict[str, Any], html: HtmlElement) -> None:
+def _extract_ftm(context: Context, data: dict[str, Any], html: HtmlElement) -> None:
     """Extract FollowTheMoney entity properties from HTML.
 
     Args:
@@ -194,15 +189,20 @@ def parse(context: Context, data: dict[str, Any]) -> None:
         ```
     """
     with context.http.rehash(data) as result:
-
         if result.html is not None:
-            # Get extra metadata from the DOM
-            parse_for_metadata(context, data, result.html)
+            context.log.info("Parse HTML", url=result.url)
+
+            # Extract page title
+            for title in result.html.xpath(".//title/text()"):
+                if title is not None and "title" not in data:
+                    data["title"] = title
+
+            _extract_metadata(context, data, result.html)
 
             if context.params.get("schema") is not None:
-                parse_ftm(context, data, result.html)
+                _extract_ftm(context, data, result.html)
 
-            parse_html(context, data, result)
+            _extract_urls(context, data, result.html, result.url)
 
         rules = context.params.get("store") or {"match_all": {}}
         if parse_rule(rules).apply(result):
@@ -256,66 +256,23 @@ def parse_listing(context: Context, data: dict[str, Any]) -> None:
 
     with context.http.rehash(data) as result:
         if result.html is not None:
+            base_url = data.get("url", result.url)
+
             for item in result.html.xpath(items_xpath):
                 item_data = {**data}
-                parse_for_metadata(context, item_data, item)
+                _extract_metadata(context, item_data, item)
+
                 if not should_skip_incremental(context, item_data):
                     if should_parse_html:
-                        _parse_html_part(context, item_data, item)
+                        _extract_urls(context, item_data, item, base_url)
                     if should_emit:
                         context.emit(rule="item", data=item_data)
 
             paginate(context, data, result.html)
+
             rules = context.params.get("store") or {"match_all": {}}
             if parse_rule(rules).apply(result):
                 context.emit(rule="store", data=data)
-
-
-def _parse_html_part(context: Context, data: dict[str, Any], html: HtmlElement) -> None:
-    """Parse URLs from an HTML fragment (internal helper)."""
-    context.log.info("Parse HTML part")
-
-    include = context.params.get("include_paths")
-    if include is None:
-        roots = [html]
-    else:
-        roots = []
-        for path in include:
-            roots = roots + html.xpath(path)
-
-    seen = set()
-    for root in roots:
-        for tag_query, attr_name in URL_TAGS:
-            for element in root.xpath(tag_query):
-                attr = element.get(attr_name)
-                if attr is None:
-                    continue
-
-                try:
-                    url = urljoin(data["url"], attr)
-                    key = url
-                except Exception:
-                    context.log.warning("Invalid URL", url=attr)
-                    continue
-
-                if url is None or key is None or key in seen:
-                    continue
-                seen.add(key)
-
-                tag = make_key(context.run_id, key)
-                if context.check_tag(tag):
-                    continue
-                context.set_tag(tag, None)
-                data["url"] = url
-
-                if data.get("title") is None:
-                    if context.get("link_title", False):
-                        data["title"] = collapse_spaces(element.text_content())
-                    elif element.get("title"):
-                        data["title"] = collapse_spaces(element.get("title"))
-
-                context.http.client.headers["Referer"] = url
-                context.emit(rule="fetch", data=data)
 
 
 @register("parse_jq")
@@ -426,5 +383,5 @@ def parse_xml(context: Context, data: dict[str, Any]) -> None:
     """
     result = context.http.rehash(data)
     if result.xml is not None:
-        parse_for_metadata(context, data, result.xml)
+        _extract_metadata(context, data, result.xml)
     context.emit(data=data)

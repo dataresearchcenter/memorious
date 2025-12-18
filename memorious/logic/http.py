@@ -295,7 +295,7 @@ class ContextHttpResponse:
                 parts.append(hash_data(url_parts.query))
             if self.request.content:
                 parts.append(hash_data(self.request.content))
-            return make_key(*parts)
+            return make_key(*parts, hash_data(url))
         return None
 
     @property

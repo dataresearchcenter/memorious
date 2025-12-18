@@ -2,9 +2,6 @@ import os
 from datetime import datetime
 from urllib.parse import urlparse
 
-import requests
-import requests_ftp
-
 from memorious.core import get_rate_limit
 from memorious.operations import register
 from memorious.settings import Settings
@@ -14,6 +11,14 @@ settings = Settings()
 
 @register("ftp_fetch")
 def ftp_fetch(context, data):
+
+    try:
+        import requests
+        import requests_ftp
+    except ImportError as e:
+        context.log.error("Please install ftp dependencies: `requests-ftp`")
+        raise e
+
     url = data.get("url")
     context.log.info("FTP fetch", url=url)
     requests_ftp.monkeypatch_session()
