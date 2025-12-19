@@ -127,14 +127,34 @@ class Crawler:
             continue_on_error=continue_on_error,
         )
 
-    def run(self, incremental=None, run_id=None, continue_on_error=None):
+    def run(
+        self,
+        incremental=None,
+        run_id=None,
+        continue_on_error=None,
+        concurrency: int = 1,
+        wait: bool | None = None,
+    ):
         """
-        Run the crawler synchronously.
+        Run the crawler.
 
-        Defers the initial stage and starts a worker to process all jobs
-        until completion.
+        Defers the initial stage and starts a worker to process jobs.
+
+        Args:
+            incremental: Skip already-processed items (default: from settings).
+            run_id: Unique run identifier (default: auto-generated UUID).
+            continue_on_error: Continue on errors (default: from settings).
+            concurrency: Number of concurrent jobs to process. Use >1 for I/O-bound
+                crawlers to improve throughput (default: 1).
+            wait: If True, block until worker is stopped by signal. If False,
+                process all queued jobs and return. Default: False for concurrency=1,
+                True for concurrency>1 (required for async execution).
         """
         from memorious.tasks import app
+
+        # Concurrency > 1 requires wait=True for async execution
+        if not wait:
+            wait = concurrency > 1
 
         # Defer the initial stage
         self.start(
@@ -143,8 +163,12 @@ class Crawler:
             continue_on_error=continue_on_error,
         )
 
-        # Run worker until all jobs are processed
-        app.run_worker(wait=False, delete_jobs=DeleteJobCondition.SUCCESSFUL)
+        # Run worker
+        app.run_worker(
+            wait=wait,
+            concurrency=concurrency,
+            delete_jobs=DeleteJobCondition.SUCCESSFUL,
+        )
 
     def defer(
         self,

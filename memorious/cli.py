@@ -4,7 +4,7 @@ from typing import Annotated, Optional
 
 import typer
 from anystore.logging import get_logger
-from openaleph_procrastinate.app import run_sync_worker
+from procrastinate.jobs import DeleteJobCondition
 from rich.console import Console
 
 from memorious.core import get_settings, init_memorious, settings
@@ -50,24 +50,54 @@ def run_crawler(
         bool,
         typer.Option("--flush", help="Delete all existing data before execution"),
     ] = False,
+    concurrency: Annotated[
+        int,
+        typer.Option(
+            "--concurrency",
+            "-c",
+            help="Number of concurrent jobs (use >1 for I/O-bound crawlers)",
+        ),
+    ] = 1,
+    wait: Annotated[
+        bool,
+        typer.Option(
+            "--wait",
+            "-w",
+            help="Keep worker running after jobs complete (until interrupted)",
+        ),
+    ] = False,
 ):
     """Run a crawler from a YAML config file."""
     crawler = get_crawler(uri)
     if flush:
         crawler.flush()
-    crawler.run(continue_on_error=continue_on_error)
+    # Concurrency > 1 requires wait=True
+    if concurrency > 1 and not wait:
+        console.print(
+            f"[dim]Running with concurrency={concurrency} (wait=True required)[/dim]"
+        )
+    crawler.run(continue_on_error=continue_on_error, concurrency=concurrency, wait=wait)
     console.print(f"Crawler [bold]{crawler.name}[/bold] completed")
 
 
 @cli.command("worker")
 def worker(
     concurrency: Annotated[
-        int, typer.Option("--concurrency", "-c", help="Number of concurrent workers")
+        int,
+        typer.Option(
+            "--concurrency",
+            "-c",
+            help="Number of concurrent jobs (use >1 for I/O-bound crawlers)",
+        ),
     ] = 1,
 ):
     """Start the procrastinate worker to process crawler jobs."""
     console.print(f"Starting memorious worker with concurrency={concurrency}")
-    run_sync_worker(procrastinate_app, concurrency=concurrency)
+    procrastinate_app.run_worker(
+        wait=True,
+        concurrency=concurrency,
+        delete_jobs=DeleteJobCondition.SUCCESSFUL,
+    )
 
 
 @cli.command("cancel")

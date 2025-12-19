@@ -19,6 +19,7 @@ log = get_logger(__name__)
 
 # Create the procrastinate app
 app: App = make_app("memorious.tasks")
+sync_app: App = make_app("memorious.tasks", sync=True)
 
 
 @task(app=app, retry=3)
@@ -101,5 +102,5 @@ def defer_stage(
             "data": data,
         },
     )
-    with app.open():
-        job.defer(app, priority=priority)
+    with sync_app.open():
+        job.defer(sync_app, priority=priority)
