@@ -104,15 +104,21 @@ def test_pipeline_auth(httpbin_auth_crawler, auth_output_dir):
 
     # Check that files were stored
     output_files = list(auth_output_dir.glob("**/*.json"))
-    assert len(output_files) > 0, "Expected JSON metadata files from crawler"
+    assert len(output_files) > 0, "Expected JSON files from crawler"
 
-    # Find and verify the response content
-    # The directory store creates <hash>.<filename>.json metadata files
-    json_files = [f for f in auth_output_dir.glob("**/*.json")]
-    assert len(json_files) > 0, "Expected metadata JSON file"
+    # Find the metadata file (named by content_hash, which is a 40-char hex string)
+    # Raw content files have descriptive names like "testpass.json"
+    import re
 
-    # Read metadata to get content_hash
-    with open(json_files[0]) as f:
+    meta_files = [
+        f
+        for f in auth_output_dir.glob("**/*.json")
+        if re.match(r"^[a-f0-9]{40}$", f.stem)
+    ]
+    assert len(meta_files) > 0, "Expected metadata JSON file (named by content_hash)"
+
+    # Read metadata to verify the request was authenticated
+    with open(meta_files[0]) as f:
         metadata = json.load(f)
 
     # Verify the request was authenticated (status_code 200, not 401)
