@@ -22,14 +22,15 @@ pytest
 
 This is a hard fork of the [original memorious project](https://github.com/alephdata/memorious) that was discontinued in 2023.
 
-### Changelog since v2.6.4
+### Changelog since v2.6.4 (last legacy release)
 
 - Remove OCR feature
 - Remove dataset (db operations)
-- Replace Redis with procrastinate job queue
-- Replace servicelayer with anystore/ftm-lakehouse
-- Use httpx instead of requests
+- Replace Redis workers / queue with [procrastinate job queue](https://openaleph.org/docs/lib/openaleph-procrastinate/)
+- Replace `servicelayer` with [ftm-lakehouse](https://openaleph.org/docs/lib/ftm-lakehouse/) for storage
+- Use [httpx](https://www.python-httpx.org/) instead of `requests`
 - Operations registry (replaces entry points)
+- Many more useful [operations and helpers](./operations.md)
 
 ## License
 

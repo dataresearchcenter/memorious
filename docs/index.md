@@ -1,6 +1,19 @@
+[![memorious on pypi](https://img.shields.io/pypi/v/memorious)](https://pypi.org/project/memorious/)
+[![Python test and package](https://github.com/dataresearchcenter/memorious/actions/workflows/python.yml/badge.svg)](https://github.com/dataresearchcenter/memorious/actions/workflows/python.yml)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
+[![Coverage Status](https://coveralls.io/repos/github/dataresearchcenter/memorious/badge.svg?branch=main)](https://coveralls.io/github/dataresearchcenter/memorious?branch=main)
+[![AGPLv3+ License](https://img.shields.io/pypi/l/memorious)](./LICENSE)
+
 # Memorious
 
 A light-weight web scraping toolkit for Python.
+
+!!! Info
+    This is a hard fork of the [original memorious project](https://github.com/alephdata/memorious) that was discontinued in 2023. Currently, this package can only be installed via git:
+
+    `pip install "memorious @ git+https://github.com/dataresearchcenter/memorious.git"`
+
+    See [development section](./development.md) for what has changed since.
 
 ## Features
 
