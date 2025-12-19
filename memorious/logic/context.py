@@ -104,11 +104,11 @@ class Context:
         key = make_key(*parts)
         if key is None:
             return None
+        if key.startswith(self.crawler.name):  # erf
+            key = key[len(self.crawler.name) + 1 :]
         if prefix:
             key = make_key(prefix, key)
-        if not key.startswith(self.crawler.name):
-            return make_key(self.crawler.name, key)
-        return key
+        return make_key(self.crawler.name, key)
 
     def _make_emit_cache_key(self, data: dict[str, Any]) -> str | None:
         """Generate a cache key for incremental emit tracking.
@@ -159,11 +159,10 @@ class Context:
         if self.incremental:
             cache_key = self._make_emit_cache_key(data)
             if cache_key and self.check_tag(cache_key):
-                self.log.debug("Skipping emit (incremental)", cache_key=cache_key)
+                self.log.info("Skipping emit (incremental)", cache_key=cache_key)
                 return
             # Store cache key in data for marking complete at store stage
-            if cache_key:
-                data["emit_cache_key"] = cache_key
+            data["_emit_cache_key"] = cache_key
 
         # Debug sampling
         if self.settings.debug:
@@ -194,7 +193,7 @@ class Context:
         Called by store operations after successful storage to enable
         incremental skipping on future runs.
         """
-        cache_key = data.get("emit_cache_key")
+        cache_key = data.get("_emit_cache_key")
         if cache_key:
             self.set_tag(cache_key, datetime.now())
             self.log.debug("Marked emit complete", cache_key=cache_key)

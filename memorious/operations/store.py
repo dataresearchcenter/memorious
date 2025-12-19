@@ -11,9 +11,12 @@ import mimetypes
 import os
 import shutil
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 import httpx
+from anystore.util import join_relpaths
 from ftm_lakehouse import get_lakehouse
+from ftm_lakehouse.model import File
 from normality import safe_filename
 from rigour.mime import normalize_mimetype
 
@@ -50,6 +53,10 @@ def _get_file_extension(file_name: str | None, mime_type: str | None) -> str:
             if len(extension) > 1:
                 return extension
     return "raw"
+
+
+def _patch_file(file: File, **data: Any) -> File:
+    return File(**{**file.model_dump(), **data})
 
 
 @register("directory")
@@ -142,11 +149,11 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
             return
 
         file_name = data.get("file_name", result.file_name)
+        file_name = file_name or data["url"].split("/")[-1]
         # httpx.Headers is case-insensitive
         headers = httpx.Headers(data.get("headers", {}))
         mime_type = normalize_mimetype(headers.get("content-type"))
         extension = _get_file_extension(file_name, mime_type)
-        file_name = file_name or "data"
         file_name = safe_filename(file_name, extension=extension)
 
         # Use custom URI if provided, otherwise use context archive
@@ -156,19 +163,24 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         else:
             archive = context.archive
 
-        # Store file in lakehouse archive with metadata
-        with result.local_path() as local_path:
-            file_info = archive.archive_file(
-                local_path,
-                origin="memorious",
-                name=file_name,
-                mimetype=mime_type,
-                source_url=data.get("url"),
-            )
-
-        context.log.info(
-            "Store [lakehouse]", file=file_name, checksum=file_info.checksum
+        # Store file in lakehouse archive with metadata. If the archive is the
+        # same as the memorious intermediary archive (which is the default), the
+        # file already exists and only the metadata is updated.
+        url_parts = urlsplit(data["url"])
+        data.update(
+            origin="memorious",
+            name=file_name,
+            key=join_relpaths(url_parts.netloc, url_parts.path),
+            mimetype=mime_type,
         )
+        file = archive.lookup_file(content_hash)
+        if file is not None:
+            file = _patch_file(file, **data)
+        with result.local_path() as local_path:
+            # this only stores if checksum is not already existing
+            file = archive.archive_file(local_path, **data)
+
+        context.log.info("Store [lakehouse]", file=file_name, checksum=file.checksum)
 
         # Mark incremental completion
         context.mark_emit_complete(data)
