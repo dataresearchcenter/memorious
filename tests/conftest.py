@@ -8,6 +8,40 @@ from memorious.logic.crawler import get_crawler as load_crawler
 from memorious.logic.http import ContextHttp
 
 
+@pytest.fixture(autouse=True)
+def reset_procrastinate_connector():
+    """Reset InMemoryConnector's event loop state between tests.
+
+    The InMemoryConnector stores an event loop reference in _loop that becomes
+    stale between tests. Rather than clearing all caches (which breaks task
+    registration), we just reset the connector's internal state.
+    """
+
+    def reset_connector_state():
+        try:
+            from openaleph_procrastinate.app import in_memory_connector
+
+            connector = in_memory_connector()
+            # Reset the event loop reference - it will be re-set on next open_async
+            connector._loop = None
+            connector._loop_thread_id = None
+            # Clear notification handler from previous test
+            connector.on_notification = None
+            connector.notify_channels = []
+            # Clear jobs/state from previous test
+            connector.jobs.clear()
+            connector.events.clear()
+            connector.workers.clear()
+            connector.states.clear()
+        except (ImportError, AttributeError):
+            pass
+
+    # Reset before and after each test
+    reset_connector_state()
+    yield
+    reset_connector_state()
+
+
 def get_crawler_dir():
     file_path = os.path.realpath(__file__)
     crawler_dir = os.path.normpath(os.path.join(file_path, "../testdata/config"))
