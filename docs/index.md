@@ -21,8 +21,8 @@ A light-weight web scraping toolkit for Python.
 - **Built-in operations** - Fetch, parse, store, and more
 - **Incremental crawling** - Skip already-processed items
 - **HTTP caching** - Conditional requests with ETag support
-- **Aleph integration** - Push data to Aleph instances
-- **FTM support** - Store FollowTheMoney entities
+- **OpenAleph integration** - Push data to [OpenAleph](https://openaleph.org) instances
+- **FTM support** - Extract and store [FollowTheMoney](https://followthemoney.tech) entities
 
 ## Quick Example
 
