@@ -173,7 +173,7 @@ class ContextHttpResponse:
         self._status_code: int | None = None
         self._url: str | None = None
         self._request_id: str | None = None
-        self._headers: httpx.Headers | None = None
+        self._headers: httpx.Headers | dict[str, str] | None = None
         self._encoding: str | None = None
         self._content_hash: str | None = None
         self.retrieved_at: str | None = None
@@ -305,15 +305,15 @@ class ContextHttpResponse:
         return self._status_code
 
     @property
-    def headers(self) -> httpx.Headers:
-        """Get response headers (httpx.Headers is already case-insensitive)."""
+    def headers(self) -> httpx.Headers | dict[str, str]:
+        """Get response headers (case-insensitive via httpx.Headers or lowercase dict)."""
         if self._headers is None and self.response:
             self._headers = self.response.headers
-        return self._headers or httpx.Headers()
+        return self._headers or {}
 
     @property
     def last_modified(self) -> str | None:
-        last_modified_header = self.headers.get("Last-Modified")
+        last_modified_header = self.headers.get("last-modified")
         if last_modified_header is not None:
             # Tue, 15 Nov 1994 12:45:26 GMT
             last_modified = parse_date(last_modified_header)
@@ -460,10 +460,11 @@ class ContextHttpResponse:
         self._status_code = data.get("status_code")
         self._url = data.get("url")
         self._request_id = data.get("request_id")
-        self._headers = httpx.Headers(data.get("headers", {}))
         self._encoding = data.get("encoding")
         self._content_hash = data.get("content_hash")
         self.retrieved_at = data.get("retrieved_at")
+        # Store headers as lowercase dict (httpx.Headers can't handle unicode)
+        self._headers = {k.lower(): v for k, v in data.get("headers", {}).items()}
 
     @classmethod
     def deserialize(

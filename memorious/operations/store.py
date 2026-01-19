@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlparse
 
-import httpx
 from anystore.util import join_relpaths, make_checksum
 from ftm_lakehouse import get_lakehouse
 from ftm_lakehouse.model import File
@@ -108,8 +107,8 @@ def _compute_file_path(
     # Extract file_name from data or use provided override
     file_name = raw_file_name or data.get("file_name")
 
-    # Extract MIME type from headers
-    headers = httpx.Headers(data.get("headers", {}))
+    # Extract MIME type from headers (use lowercase keys for case-insensitive access)
+    headers = {k.lower(): v for k, v in data.get("headers", {}).items()}
     mime_type = normalize_mimetype(headers.get("content-type"))
 
     compute_path = context.params.get("compute_path", {})
@@ -346,7 +345,7 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         file_name = relative_path.name
 
         # Extract MIME type from headers for lakehouse metadata
-        headers = httpx.Headers(data.get("headers", {}))
+        headers = {k.lower(): v for k, v in data.get("headers", {}).items()}
         mime_type = normalize_mimetype(headers.get("content-type"))
 
         # Use custom URI if provided, otherwise use context archive
