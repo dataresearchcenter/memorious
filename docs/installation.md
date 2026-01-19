@@ -3,7 +3,7 @@
 ## From PyPI
 
 ```bash
-pip install memorious
+pip install "memorious @ git+https://github.com/dataresearchcenter/memorious.git"
 ```
 
 ## From Source
