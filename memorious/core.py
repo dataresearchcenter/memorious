@@ -4,8 +4,8 @@ import os
 from anystore.functools import weakref_cache as cache
 from anystore.logging import get_logger
 from anystore.store import get_store
-from anystore.tags import Tags
-from ftm_lakehouse.lake.lakehouse import get_archive
+from ftm_lakehouse.repository.factories import get_tags as _get_tags
+from ftm_lakehouse.storage.tags import TagStore
 from servicelayer.cache import get_fakeredis, get_redis
 from servicelayer.extensions import get_extensions
 from servicelayer.logs import configure_logging
@@ -32,14 +32,10 @@ def get_conn():
 
 
 @cache
-def get_tags(dataset: str) -> Tags:
+def get_tags(dataset: str) -> TagStore:
+    """Get tags store"""
     settings = get_settings()
-    if settings.tags_uri:
-        store = get_store(settings.tags_uri)
-    else:
-        store = get_archive(dataset).get_cache("memorious")
-    store.raise_on_nonexist = False
-    return Tags(store)
+    return _get_tags(dataset, settings.tags_uri, "memorious")
 
 
 @cache

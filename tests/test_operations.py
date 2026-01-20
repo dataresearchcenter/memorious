@@ -288,7 +288,7 @@ def test_cleanup_archive(context, httpbin_url):
     url = f"{httpbin_url}/user-agent"
     result = context.http.get(url, headers={"User-Agent": "Memorious Test"})
     data = result.serialize()
-    assert context.archive.lookup_file(data["content_hash"]) is not None
+    assert context.archive.get(data["content_hash"]) is not None
     # cleanup_archive may not actually delete due to NotImplementedError in ftm_lakehouse
     cleanup_archive(context, data)
     # NOTE: File may still exist if storage backend doesn't support deletion
@@ -296,6 +296,8 @@ def test_cleanup_archive(context, httpbin_url):
 
 def test_lakehouse_default(context, mocker, httpbin_url):
     """Test lakehouse store with default archive."""
+    from ftm_lakehouse import get_lakehouse
+
     url = f"{httpbin_url}/user-agent"
     result = context.http.get(url, headers={"User-Agent": "Memorious Test"})
     data = result.serialize()
@@ -304,38 +306,58 @@ def test_lakehouse_default(context, mocker, httpbin_url):
     lakehouse(context, data)
 
     # Verify file is in the default archive
-    # With url_path default, name comes from URL path (user_agent.json after safe_filename)
+    # With url_path default, name comes from URL path (user-agent, no safe_filename)
+    # Note: get_all() returns all metadata files for a checksum (HTTP fetch creates one,
+    # lakehouse creates another with proper name)
     content_hash = data.get("content_hash")
-    file_info = context.archive.lookup_file(content_hash)
-    assert file_info is not None
-    assert file_info.name == "user_agent.json"
+    files = list(context.archive.get_all(content_hash))
+    assert len(files) >= 1
+    file_names = [f.name for f in files]
+    assert "user-agent" in file_names
     assert context.emit.call_count == 1
 
+    # Verify entity was created with origin=crawl
+    dataset = get_lakehouse().get_dataset(context.crawler.name)
+    entities = [
+        e
+        for e in dataset.entities.query(origin="crawl")
+        if content_hash in e.get("contentHash", [])
+    ]
+    assert len(entities) == 1
+    assert entities[0].schema.name == "Document"
 
-def test_lakehouse_custom_uri(context, mocker, httpbin_url, tmp_path):
-    """Test lakehouse store with custom URI."""
-    url = f"{httpbin_url}/user-agent"
-    result = context.http.get(url, headers={"User-Agent": "Memorious Test"})
+
+def test_lakehouse_make_entities_disabled(context, mocker, httpbin_url):
+    """Test lakehouse store with entity generation disabled."""
+    from ftm_lakehouse import get_lakehouse
+
+    url = f"{httpbin_url}/html"
+    result = context.http.get(url)
     data = result.serialize()
 
-    # Set custom URI in params
-    custom_uri = f"file://{tmp_path}"
-    context.params["uri"] = custom_uri
+    # Disable entity generation
+    context.params["make_entities"] = False
 
     mocker.patch.object(context, "emit")
     lakehouse(context, data)
 
-    # Verify file is in the custom archive
-    from ftm_lakehouse import get_lakehouse
-
-    custom_archive = get_lakehouse(custom_uri).get_dataset(context.crawler.name).archive
+    # Verify file is in the archive
     content_hash = data.get("content_hash")
-    file_info = custom_archive.lookup_file(content_hash)
-    assert file_info is not None
+    files = list(context.archive.get_all(content_hash))
+    assert len(files) >= 1
     assert context.emit.call_count == 1
 
+    # Verify no entity was created for this file
+    dataset = get_lakehouse().get_dataset(context.crawler.name)
+    entities = [
+        e
+        for e in dataset.entities.query(origin="crawl")
+        if content_hash in e.get("contentHash", [])
+    ]
+    assert len(entities) == 0
+
     # Clean up param
-    del context.params["uri"]
+    del context.params["make_entities"]
 
 
 # Tests for _compute_file_path helper function

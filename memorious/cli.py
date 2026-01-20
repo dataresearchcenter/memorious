@@ -71,13 +71,15 @@ def run_crawler(
     crawler = get_crawler(uri)
     if flush:
         crawler.flush()
-    # Concurrency > 1 requires wait=True
-    if concurrency > 1 and not wait:
-        console.print(
-            f"[dim]Running with concurrency={concurrency} (wait=True required)[/dim]"
-        )
+    crawler.log.info(
+        f"[{crawler.name}] Starting Memorious crawler ...",
+        continue_on_error=continue_on_error,
+        flush=flush,
+        concurrency=concurrency,
+        wait=wait,
+    )
     crawler.run(continue_on_error=continue_on_error, concurrency=concurrency, wait=wait)
-    console.print(f"Crawler [bold]{crawler.name}[/bold] completed")
+    crawler.log.info(f"[{crawler.name}] Crawler completed.")
 
 
 @cli.command("worker")

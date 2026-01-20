@@ -15,8 +15,6 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlparse
 
 from anystore.util import join_relpaths, make_checksum
-from ftm_lakehouse import get_lakehouse
-from ftm_lakehouse.model import File
 from normality import safe_filename
 from rigour.mime import normalize_mimetype
 
@@ -25,6 +23,9 @@ from memorious.operations import register
 
 if TYPE_CHECKING:
     from memorious.logic.context import Context
+
+
+CRAWL_ORIGIN = "crawl"
 
 
 def _get_directory_path(context: Context) -> str:
@@ -45,6 +46,7 @@ def _compute_file_path(
     data: dict[str, Any],
     content_hash: str,
     raw_file_name: str | None = None,
+    safe_names: bool = True,
 ) -> Path:
     """Compute the target file path based on compute_path configuration.
 
@@ -137,8 +139,10 @@ def _compute_file_path(
             raise ValueError(f"Template must include a file name: {template}")
         # Extension from rendered template name, fallback to mime_type
         extension = _get_file_extension(name_part, mime_type)
-        safe_name = safe_filename(name_part, extension=extension)
-        return Path(dir_part) / safe_name if dir_part else Path(safe_name)
+        final_name = (
+            safe_filename(name_part, extension=extension) if safe_names else name_part
+        )
+        return Path(dir_part) / final_name if dir_part else Path(final_name)
 
     elif method == "url_path":
         # Use the URL path with optional domain prefix and strip_prefix
@@ -167,8 +171,10 @@ def _compute_file_path(
 
         # Extension from URL basename, fallback to mime_type
         extension = _get_file_extension(name_part, mime_type)
-        safe_name = safe_filename(name_part, extension=extension)
-        return Path(dir_part) / safe_name if dir_part else Path(safe_name)
+        final_name = (
+            safe_filename(name_part, extension=extension) if safe_names else name_part
+        )
+        return Path(dir_part) / final_name if dir_part else Path(final_name)
 
     elif method == "file_name":
         # Use only the file name (flat structure)
@@ -176,7 +182,10 @@ def _compute_file_path(
         file_name = file_name or "data"
         # Extension from provided file_name, fallback to mime_type
         extension = _get_file_extension(file_name, mime_type)
-        return Path(safe_filename(file_name, extension=extension))
+        final_name = (
+            safe_filename(file_name, extension=extension) if safe_names else file_name
+        )
+        return Path(final_name)
 
     else:
         raise ValueError(f"Unknown compute_path method: {method}")
@@ -196,10 +205,6 @@ def _get_file_extension(file_name: str | None, mime_type: str | None) -> str:
             if len(extension) > 1:
                 return extension
     return "raw"
-
-
-def _patch_file(file: File, **data: Any) -> File:
-    return File(**{**file.model_dump(), **data})
 
 
 @register("directory")
@@ -302,7 +307,6 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         data: Must contain content_hash from a fetched response.
 
     Params:
-        uri: Custom lakehouse URI (default: context.archive).
         compute_path: Configure how file keys are computed.
             method: The path computation method (default: "url_path")
                 - "url_path": Use the URL path
@@ -314,6 +318,7 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
                     strip_prefix: str - Strip this prefix from the path
                 For template:
                     template: str - Jinja2 template with data context
+        make_entities: Create FTM entities from stored files (default: true)
 
     Example:
         ```yaml
@@ -321,7 +326,6 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
           store:
             method: lakehouse
             params:
-              uri: s3://bucket/archive
               compute_path:
                 method: url_path
                 params:
@@ -337,9 +341,9 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
             context.emit_warning("No content hash in data.")
             return
 
-        # Compute the file key using compute_path config
+        # Compute the file key using compute_path config (no safe_filename for lakehouse)
         relative_path = _compute_file_path(
-            context, data, content_hash, result.file_name
+            context, data, content_hash, result.file_name, safe_names=False
         )
         file_key = str(relative_path)
         file_name = relative_path.name
@@ -348,28 +352,22 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         headers = {k.lower(): v for k, v in data.get("headers", {}).items()}
         mime_type = normalize_mimetype(headers.get("content-type"))
 
-        # Use custom URI if provided, otherwise use context archive
-        uri = context.params.get("uri")
-        if uri:
-            archive = get_lakehouse(uri).get_dataset(context.crawler.name).archive
-        else:
-            archive = context.archive
-
         # Store file in lakehouse archive with metadata. If the archive is the
         # same as the memorious intermediary archive (which is the default), the
-        # file already exists and only the metadata is updated.
-        data.update(
-            origin="memorious",
-            name=file_name,
-            key=file_key,
-            mimetype=mime_type,
-        )
-        file = archive.lookup_file(content_hash)
-        if file is not None:
-            file = _patch_file(file, **data)
+        # file already exists and only the metadata is stored.
         with result.local_path() as local_path:
-            # this only stores if checksum is not already existing
-            file = archive.archive_file(local_path, **data)
+            file = context.archive.store(
+                local_path,
+                name=file_name,
+                key=file_key,
+                mimetype=mime_type,
+            )
+
+        # Generate entities
+        make_entities = context.params.get("make_entities", True)
+        if make_entities:
+            entities = [file.to_entity(), *file.make_parents()]
+            context.entities.add_many(entities, origin=CRAWL_ORIGIN)
 
         context.log.info(
             "Store [lakehouse]", file=file_name, key=file_key, checksum=file.checksum
@@ -402,10 +400,10 @@ def cleanup_archive(context: Context, data: dict[str, Any]) -> None:
     if content_hash is None:
         context.emit_warning("No content hash in data.")
         return
-    file_info = context.archive.lookup_file(content_hash)
+    file_info = context.archive.get(content_hash)
     if file_info:
         try:
-            context.archive.delete_file(file_info)
+            context.archive.delete(file_info)
         except NotImplementedError:
             context.log.warning("File deletion not supported by storage backend")
 

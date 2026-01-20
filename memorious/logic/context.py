@@ -17,8 +17,9 @@ from anystore.store.virtual import get_virtual
 from anystore.tags import Tags
 from anystore.util import ensure_uuid
 from anystore.util import join_relpaths as make_key
-from ftm_lakehouse import get_archive
-from ftm_lakehouse.service.archive import DatasetArchive
+from anystore.util import make_data_checksum
+from ftm_lakehouse import get_archive, get_entities
+from ftm_lakehouse.repository import ArchiveRepository, EntityRepository
 from servicelayer.rate_limit import RateLimit
 from structlog.stdlib import BoundLogger
 
@@ -50,7 +51,8 @@ class Context:
     check: ContextCheck
     settings: Settings
     tags: Tags
-    archive: DatasetArchive
+    archive: ArchiveRepository
+    entities: EntityRepository
     cache: BaseStore
 
     def __init__(self, crawler: Crawler, stage: CrawlerStage, state: dict[str, Any]):
@@ -71,6 +73,7 @@ class Context:
 
         self.settings = settings
         self.archive = get_archive(self.crawler.name)
+        self.entities = get_entities(self.crawler.name)
         self.tags = get_tags(self.crawler.name)
         self.cache = get_cache()
 
@@ -118,6 +121,9 @@ class Context:
         cache_key = data.get("emit_cache_key")
         if cache_key:
             return self.make_key(cache_key, prefix="emit")
+        foreign_id = data.get("foreign_id")
+        if foreign_id:
+            return self.make_key(foreign_id, prefix="emit")
         content_hash = data.get("content_hash")
         if content_hash:
             return self.make_key(content_hash, prefix="emit")
@@ -274,13 +280,16 @@ class Context:
         checksum: str | None = None,
     ) -> str:
         """Put a file into permanent storage so it can be visible to other stages."""
-        file_info = self.archive.archive_file(
+        file_info = self.archive.store(
             file_path, checksum=checksum, origin=origin or DEFAULT_ORIGIN
         )
         return file_info.checksum
 
     def store_data(self, data: Any, checksum: str | None = None) -> str:
-        key = ensure_uuid()
+        if not checksum:
+            key = make_data_checksum(data)
+        else:
+            key = checksum
         with get_virtual() as v:
             v.store.put(key, data, serialization_mode="auto")
             return self.store_file(
@@ -288,11 +297,11 @@ class Context:
             )
 
     def open(self, content_hash: str) -> ContextManager[IO[bytes]]:
-        file_info = self.archive.lookup_file(content_hash)
-        return self.archive.open_file(file_info)
+        file_info = self.archive.get(content_hash)
+        return self.archive.open(file_info)
 
     def local_path(self, content_hash: str) -> ContextManager[Path]:
-        file_info = self.archive.lookup_file(content_hash)
+        file_info = self.archive.get(content_hash)
         return self.archive.local_path(file_info)
 
     def dump_state(self) -> dict[str, Any]:
