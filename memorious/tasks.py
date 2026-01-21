@@ -51,6 +51,13 @@ def execute_stage(job: DatasetJob) -> None:
     # Load crawler from config file URI
     crawler = get_crawler(payload["config_file"])
 
+    # Check max_runtime before executing - skip if run has exceeded time limit
+    if crawler.is_run_expired(run_id):
+        job.log.warning(
+            f"Run exceeded max_runtime ({crawler.max_runtime}s), skipping task"
+        )
+        return
+
     stage = crawler.get(stage_name)
     if stage is None:
         job.log.error(f"Stage not found: `{stage_name}`")
@@ -70,7 +77,7 @@ def execute_stage(job: DatasetJob) -> None:
         context.execute(payload.get("data", {}))
     except Exception:
         if not payload.get("continue_on_error", False):
-            # TODO: cacnel dataset
+            crawler.stop()
             raise
 
 

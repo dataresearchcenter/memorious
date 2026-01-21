@@ -10,7 +10,56 @@ Complete reference for crawler YAML configuration.
 | `description` | string | `None` | Human-readable description |
 | `delay` | int | `0` | Default delay between tasks (seconds) |
 | `expire` | int | `1` | Days until cached data expires |
+| `max_runtime` | int | `0` | Maximum runtime in seconds (0 = unlimited). See [Runtime Control](#runtime-control) |
 | `stealthy` | bool | `false` | Use random User-Agent headers |
+
+## Runtime Control
+
+### Max Runtime
+
+The `max_runtime` option limits how long a crawler can run. This is useful for CI environments with time limits (e.g., GitHub Actions 6-hour limit).
+
+```yaml
+name: my_crawler
+max_runtime: 21600  # 6 hours in seconds
+```
+
+When using `memorious run`:
+
+- A timer starts when the crawler begins
+- When `max_runtime` is exceeded, SIGTERM is sent to stop the worker
+- Pending jobs are skipped (checked before each stage execution)
+- The crawler exits gracefully, flushing any pending entity data
+
+Can also be set globally via `MEMORIOUS_MAX_RUNTIME` environment variable.
+
+### Error Handling
+
+When a stage raises an exception:
+
+- **With `--continue-on-error`**: The error is logged and execution continues with other jobs
+- **Without `--continue-on-error`** (default): The crawler stops immediately by:
+    1. Sending SIGTERM to terminate the worker process
+    2. Pending jobs remain in the queue but are not processed
+
+### Clearing Previous Runs
+
+By default, `memorious run` cancels any pending jobs from previous runs before starting. Control this with `--clear-runs` / `--no-clear-runs`:
+
+```bash
+# Default: cancel previous jobs before starting
+memorious run crawler.yml
+
+# Keep previous jobs in queue (resume interrupted crawl)
+memorious run crawler.yml --no-clear-runs
+```
+
+### Cancel vs Stop
+
+The crawler has two termination methods:
+
+- **`cancel()`**: Removes pending jobs from the queue. Used by `memorious cancel` CLI command.
+- **`stop()`**: Sends SIGTERM to terminate the current worker process. Used internally on unhandled errors.
 
 ## Pipeline
 

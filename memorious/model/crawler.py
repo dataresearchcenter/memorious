@@ -36,6 +36,9 @@ class CrawlerConfig(Dataset):
     expire: int = Field(
         default=1, ge=0, description="Days until incremental crawl expires"
     )
+    max_runtime: int = Field(
+        default=0, ge=0, description="Max runtime in seconds (0 = unlimited)"
+    )
     stealthy: bool = Field(default=False, description="Use random user agents")
 
     # Pipeline definition - stage name -> stage config

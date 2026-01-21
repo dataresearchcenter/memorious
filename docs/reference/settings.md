@@ -62,8 +62,9 @@ Environment variables take precedence over Docker secrets. This allows you to ov
 | Environment Variable | Type | Default | Description |
 |---------------------|------|---------|-------------|
 | `MEMORIOUS_INCREMENTAL` | `bool` | `true` | Enable incremental crawling (skip previously crawled items within expiry window) |
-| `MEMORIOUS_CONTINUE_ON_ERROR` | `bool` | `false` | Continue crawler execution when an error occurs instead of stopping |
+| `MEMORIOUS_CONTINUE_ON_ERROR` | `bool` | `false` | Continue crawler execution when an error occurs instead of stopping. When `false`, unhandled errors send SIGTERM to stop the worker |
 | `MEMORIOUS_EXPIRE` | `int` | `1` | Number of days until incremental crawl data expires |
+| `MEMORIOUS_MAX_RUNTIME` | `int` | `0` | Maximum crawler runtime in seconds (0 = unlimited). When exceeded, SIGTERM is sent to stop the worker. Useful for CI environments with time limits (e.g., GitHub Actions 6h = 21600s) |
 
 ### Rate Limiting
 
@@ -256,7 +257,22 @@ name: my_crawler
 expire: 7  # Override MEMORIOUS_EXPIRE for this crawler
 delay: 2   # Delay between tasks in seconds
 stealthy: true  # Use random User-Agent
+max_runtime: 21600  # Stop crawler after 6 hours (useful for CI)
 ```
+
+## CLI Options
+
+The `memorious run` command accepts options that affect runtime behavior:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--continue-on-error` | `false` | Don't stop on errors |
+| `--flush` | `false` | Delete all existing data before execution |
+| `--concurrency` | `1` | Number of concurrent jobs |
+| `--wait` | `false` | Keep worker running after jobs complete |
+| `--clear-runs` | `true` | Cancel pending jobs from previous runs before starting |
+
+Use `--no-clear-runs` to resume an interrupted crawl without losing queued jobs.
 
 Stage-level parameters can also override global settings:
 

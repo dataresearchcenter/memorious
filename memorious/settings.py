@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     incremental: bool = Field(default=True)
     continue_on_error: bool = Field(default=False)
     expire: int = Field(default=1, description="Days until incremental crawl expires")
+    max_runtime: int = Field(
+        default=0, description="Max runtime in seconds (0 = unlimited)"
+    )
 
     # Rate limiting
     http_rate_limit: int = Field(default=120)

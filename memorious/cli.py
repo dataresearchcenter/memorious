@@ -66,6 +66,13 @@ def run_crawler(
             help="Keep worker running after jobs complete (until interrupted)",
         ),
     ] = False,
+    clear_runs: Annotated[
+        bool,
+        typer.Option(
+            "--clear-runs/--no-clear-runs",
+            help="Cancel remaining tasks from previous runs before starting",
+        ),
+    ] = True,
 ):
     """Run a crawler from a YAML config file."""
     crawler = get_crawler(uri)
@@ -77,8 +84,14 @@ def run_crawler(
         flush=flush,
         concurrency=concurrency,
         wait=wait,
+        clear_runs=clear_runs,
     )
-    crawler.run(continue_on_error=continue_on_error, concurrency=concurrency, wait=wait)
+    crawler.run(
+        continue_on_error=continue_on_error,
+        concurrency=concurrency,
+        wait=wait,
+        clear_runs=clear_runs,
+    )
     crawler.log.info(f"[{crawler.name}] Crawler completed.")
 
 
@@ -106,7 +119,7 @@ def worker(
 def cancel(
     uri: Annotated[str, typer.Argument(help="URI or path to crawler YAML config file")],
 ):
-    """Cancel execution of a crawler."""
+    """Cancel pending jobs for a crawler."""
     crawler = get_crawler(uri)
     crawler.cancel()
     console.print(f"Crawler [bold]{crawler.name}[/bold] cancelled")
