@@ -296,10 +296,8 @@ def test_lakehouse_default(context, mocker, httpbin_url):
 
     # Verify file is in the default archive
     # With url_path default, name comes from URL path (user-agent, no safe_filename)
-    # Note: get_all() returns all metadata files for a checksum (HTTP fetch creates one,
-    # lakehouse creates another with proper name)
     content_hash = data.get("content_hash")
-    files = list(context.archive.get_all(content_hash))
+    files = list(context.archive.get_all_files(content_hash))
     assert len(files) >= 1
     file_names = [f.name for f in files]
     assert "user-agent" in file_names
@@ -332,7 +330,7 @@ def test_lakehouse_make_entities_disabled(context, mocker, httpbin_url):
 
     # Verify file is in the archive
     content_hash = data.get("content_hash")
-    files = list(context.archive.get_all(content_hash))
+    files = list(context.archive.get_all_files(content_hash))
     assert len(files) >= 1
     assert context.emit.call_count == 1
 
@@ -341,7 +339,7 @@ def test_lakehouse_make_entities_disabled(context, mocker, httpbin_url):
     entities = [
         e
         for e in dataset.entities.query(origin="crawl")
-        if content_hash in e.get("contentHash", [])
+        if content_hash in e.get("contentHash")
     ]
     assert len(entities) == 0
 

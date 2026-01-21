@@ -357,17 +357,13 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         # file already exists and only the metadata is stored.
         with result.local_path() as local_path:
             file = context.archive.store(
-                local_path,
-                name=file_name,
-                key=file_key,
-                mimetype=mime_type,
+                local_path, name=file_name, key=file_key, mimetype=mime_type, **data
             )
 
         # Generate entities
         make_entities = context.params.get("make_entities", True)
         if make_entities:
-            entities = [file.to_entity(), *file.make_parents()]
-            context.entities.add_many(entities, origin=CRAWL_ORIGIN)
+            context.entities.add_many(file.make_entities(), origin=CRAWL_ORIGIN)
 
         context.log.info(
             "Store [lakehouse]", file=file_name, key=file_key, checksum=file.checksum

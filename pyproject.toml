@@ -79,9 +79,6 @@ sphinx-rtd-theme = "^3.0.2"
 recommonmark = "^0.7.1"
 mkdocs-typer2 = "^0.1.6"
 
-
-[tool.poetry.dependencies]
-ftm-lakehouse = {develop = true}
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
@@ -98,3 +95,4 @@ PROCRASTINATE_SYNC = 1
 PROCRASTINATE_DB_URI = "memory://"
 PROCRASTINATE_APP = "memorious.tasks.app"
 LAKEHOUSE_URI = "./tests/testdata/data"
+LAKEHOUSE_JOURNAL_URI = "sqlite:///:memory:"

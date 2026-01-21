@@ -7,17 +7,17 @@ import random
 import shutil
 from copy import deepcopy
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 from tempfile import mkdtemp
 from typing import IO, Any, ContextManager, overload
 
 from anystore.logging import get_logger
+from anystore.serialize import to_store
 from anystore.store.base import BaseStore
-from anystore.store.virtual import get_virtual
 from anystore.tags import Tags
 from anystore.util import ensure_uuid
 from anystore.util import join_relpaths as make_key
-from anystore.util import make_data_checksum
 from ftm_lakehouse import get_archive, get_entities
 from ftm_lakehouse.repository import ArchiveRepository, EntityRepository
 from servicelayer.rate_limit import RateLimit
@@ -286,23 +286,14 @@ class Context:
         return file_info.checksum
 
     def store_data(self, data: Any, checksum: str | None = None) -> str:
-        if not checksum:
-            key = make_data_checksum(data)
-        else:
-            key = checksum
-        with get_virtual() as v:
-            v.store.put(key, data, serialization_mode="auto")
-            return self.store_file(
-                v.store.get_key(key), origin=CACHE_ORIGIN, checksum=checksum
-            )
+        fh = BytesIO(to_store(data))
+        return self.archive.write_blob(fh, checksum=checksum)
 
     def open(self, content_hash: str) -> ContextManager[IO[bytes]]:
-        file_info = self.archive.get(content_hash)
-        return self.archive.open(file_info)
+        return self.archive.open(content_hash)
 
     def local_path(self, content_hash: str) -> ContextManager[Path]:
-        file_info = self.archive.get(content_hash)
-        return self.archive.local_path(file_info)
+        return self.archive.local_path(content_hash)
 
     def dump_state(self) -> dict[str, Any]:
         state = deepcopy(self.state)
