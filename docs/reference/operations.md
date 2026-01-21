@@ -88,8 +88,6 @@ Operations for storing data.
 
 ::: memorious.operations.store.lakehouse
 
-::: memorious.operations.store.cleanup_archive
-
 ---
 
 ## Debug

@@ -378,36 +378,6 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         context.emit(data=data)
 
 
-@register("cleanup_archive")
-def cleanup_archive(context: Context, data: dict[str, Any]) -> None:
-    """Remove a blob from the archive.
-
-    Deletes a file from the archive after processing is complete.
-    Useful for cleaning up temporary files.
-
-    Args:
-        context: The crawler context.
-        data: Must contain content_hash of file to delete.
-
-    Example:
-        ```yaml
-        pipeline:
-          cleanup:
-            method: cleanup_archive
-        ```
-    """
-    content_hash = data.get("content_hash")
-    if content_hash is None:
-        context.emit_warning("No content hash in data.")
-        return
-    file_info = context.archive.get(content_hash)
-    if file_info:
-        try:
-            context.archive.delete(file_info)
-        except NotImplementedError:
-            context.log.warning("File deletion not supported by storage backend")
-
-
 @register("store")
 def store(context: Context, data: dict[str, Any]) -> None:
     """Store with configurable backend and incremental marking.

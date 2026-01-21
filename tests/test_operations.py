@@ -8,7 +8,6 @@ from memorious.operations.initializers import dates, enumerate, seed, sequence
 from memorious.operations.parse import parse
 from memorious.operations.store import (
     _compute_file_path,
-    cleanup_archive,
     directory,
     lakehouse,
 )
@@ -282,16 +281,6 @@ def test_directory_same_content(context, mocker, httpbin_url):
         if f.endswith(".json") and not f.startswith(first_hash)
     )
     assert len(json_files) == 1, "Should only have one content file"
-
-
-def test_cleanup_archive(context, httpbin_url):
-    url = f"{httpbin_url}/user-agent"
-    result = context.http.get(url, headers={"User-Agent": "Memorious Test"})
-    data = result.serialize()
-    assert context.archive.get(data["content_hash"]) is not None
-    # cleanup_archive may not actually delete due to NotImplementedError in ftm_lakehouse
-    cleanup_archive(context, data)
-    # NOTE: File may still exist if storage backend doesn't support deletion
 
 
 def test_lakehouse_default(context, mocker, httpbin_url):
