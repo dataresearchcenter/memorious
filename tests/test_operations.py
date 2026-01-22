@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+from datetime import datetime
 from unittest.mock import ANY
 
 from memorious.operations.fetch import fetch, session
@@ -134,18 +135,51 @@ def test_sequence(context, mocker):
 
 def test_dates(context, mocker):
     mocker.patch.object(context, "emit")
-    mocker.patch.object(context, "recurse")
     context.params["format"] = "%d-%m-%Y"
     context.params["days"] = 3
-    context.params["begin"] = "10-12-2012"
-    context.params["end"] = "20-12-2012"
+    context.params["begin"] = "20-12-2012"
+    context.params["end"] = "10-12-2012"
+    dates(context, data={"extra": "preserved"})
+    # Dates: 20, 17, 14, 11 (stops before 10)
+    assert context.emit.call_count == 4
+    # Check first and last calls
+    first_call = context.emit.call_args_list[0]
+    assert first_call.kwargs["data"]["date"] == "20-12-2012"
+    assert first_call.kwargs["data"]["date_iso"] == "2012-12-20T00:00:00"
+    assert first_call.kwargs["data"]["extra"] == "preserved"
+    last_call = context.emit.call_args_list[-1]
+    assert last_call.kwargs["data"]["date"] == "11-12-2012"
+    assert last_call.kwargs["data"]["date_iso"] == "2012-12-11T00:00:00"
+
+
+def test_dates_forward(context, mocker):
+    mocker.patch.object(context, "emit")
+    context.params["format"] = "%Y-%m-%d"
+    context.params["days"] = 3
+    context.params["begin"] = "2012-12-10"
+    context.params["end"] = "2012-12-20"
+    dates(context, data={})
+    # Forward: 10, 13, 16, 19 (stops after 19 since 22 > 20)
+    assert context.emit.call_count == 4
+    first_call = context.emit.call_args_list[0]
+    assert first_call.kwargs["data"]["date"] == "2012-12-10"
+    last_call = context.emit.call_args_list[-1]
+    assert last_call.kwargs["data"]["date"] == "2012-12-19"
+
+
+def test_dates_today_only(context, mocker):
+    mocker.patch.object(context, "emit")
+    # Clear any params from previous tests and set only days
+    context.params.clear()
+    context.params["days"] = 1
+    # Both begin and end default to now, so only today is emitted
     dates(context, data={})
     assert context.emit.call_count == 1
-    context.emit.assert_called_once_with(
-        data={"date": "20-12-2012", "date_iso": "2012-12-20T00:00:00"}
-    )
-    assert context.recurse.call_count == 1
-    context.recurse.assert_called_once_with(data={"current": "17-12-2012"})
+    # Verify today's date is emitted
+    today = datetime.now().strftime("%Y-%m-%d")
+    call_data = context.emit.call_args_list[0].kwargs["data"]
+    assert call_data["date"] == today
+    assert call_data["date_iso"].startswith(today)
 
 
 def test_enumerate(context, mocker):

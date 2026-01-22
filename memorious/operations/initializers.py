@@ -6,10 +6,11 @@ generating initial data items such as seed URLs, sequences, and dates.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from banal import ensure_dict, ensure_list
+from dateutil.relativedelta import relativedelta
 
 from memorious.operations import register
 
@@ -259,76 +260,107 @@ def sequence(context: Context, data: dict[str, Any]) -> None:
 def dates(context: Context, data: dict[str, Any]) -> None:
     """Generate a sequence of dates.
 
-    Generates dates by iterating backwards from an end date with a
-    specified interval. Useful for scraping date-based archives.
+    Generates dates by iterating between begin and end dates with a specified
+    interval. Direction is determined automatically: if begin > end, iterates
+    backwards; if begin < end, iterates forwards. Useful for scraping
+    date-based archives.
 
     Args:
         context: The crawler context.
-        data: May contain "current" to continue iteration.
+        data: Base data dict to include in each emission.
 
     Params:
         format: Date format string (default: "%Y-%m-%d").
-        end: End date string, or uses current date if not specified.
-        begin: Beginning date string.
+        begin: Begin date string (default: current date).
+        end: End date string (default: current date).
         days: Number of days per step (default: 0).
         weeks: Number of weeks per step (default: 0).
-        steps: Number of steps if begin not specified (default: 100).
+        months: Number of months per step (default: 0).
+        years: Number of years per step (default: 0).
 
     Example:
         ```yaml
         pipeline:
-          date_range:
+          # Iterate backwards from now to 2020:
+          monthly_backwards:
             method: dates
             params:
-              format: "%Y-%m-%d"
+              end: "2020-01-01"
+              months: 1
+            handle:
+              pass: fetch
+
+          # Iterate forwards from 2020 to 2024:
+          daily_forwards:
+            method: dates
+            params:
               begin: "2020-01-01"
               end: "2024-01-01"
               days: 1
             handle:
               pass: fetch
 
-          # Or with weeks:
-          weekly:
+          # Just today (both default to now):
+          today_only:
             method: dates
             params:
-              weeks: 1
-              steps: 52  # Last 52 weeks
+              days: 1
             handle:
               pass: fetch
         ```
 
     Note:
         Each emission includes both `date` (formatted string) and
-        `date_iso` (ISO format) for flexibility.
+        `date_iso` (ISO format) for flexibility. The original data
+        dict is preserved in each emission.
     """
-    format = context.params.get("format", "%Y-%m-%d")
-    delta = timedelta(
-        days=context.params.get("days", 0), weeks=context.params.get("weeks", 0)
-    )
-    if delta == timedelta():
+    format_ = context.params.get("format", "%Y-%m-%d")
+
+    days = context.params.get("days", 0)
+    weeks = context.params.get("weeks", 0)
+    months = context.params.get("months", 0)
+    years = context.params.get("years", 0)
+
+    if not any([days, weeks, months, years]):
         context.log.error("No interval given", params=context.params)
         return
 
-    if "end" in context.params:
-        current = context.params.get("end")
-        current = datetime.strptime(current, format)
-    else:
-        current = datetime.utcnow()
+    delta = relativedelta(days=days, weeks=weeks, months=months, years=years)
 
-    if "current" in data:
-        current = datetime.strptime(data.get("current"), format)
+    now = datetime.now()
 
     if "begin" in context.params:
-        begin = context.params.get("begin")
-        begin = datetime.strptime(begin, format)
+        begin = datetime.strptime(context.params["begin"], format_)
     else:
-        steps = context.params.get("steps", 100)
-        begin = current - (delta * steps)
+        begin = now
 
-    context.emit(
-        data={"date": current.strftime(format), "date_iso": current.isoformat()}
-    )
-    current = current - delta
-    if current >= begin:
-        data = {"current": current.strftime(format)}
-        context.recurse(data=data)
+    if "end" in context.params:
+        end = datetime.strptime(context.params["end"], format_)
+    else:
+        end = now
+
+    # Determine direction based on begin/end relationship
+    if begin >= end:
+        # Iterate backwards
+        current = begin
+        while current >= end:
+            context.emit(
+                data={
+                    **data,
+                    "date": current.strftime(format_),
+                    "date_iso": current.isoformat(),
+                }
+            )
+            current = current - delta
+    else:
+        # Iterate forwards
+        current = begin
+        while current <= end:
+            context.emit(
+                data={
+                    **data,
+                    "date": current.strftime(format_),
+                    "date_iso": current.isoformat(),
+                }
+            )
+            current = current + delta
