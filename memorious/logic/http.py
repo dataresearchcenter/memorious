@@ -5,6 +5,7 @@ from __future__ import annotations
 import cgi
 import io
 import json
+import random
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
 from hashlib import sha1
@@ -45,14 +46,30 @@ class ContextHttp:
         self._client: httpx.Client | None = None
         self._session_state: SessionModel | None = self._load_session()
 
+    def _get_proxy(self) -> str | None:
+        """Get a proxy URL from params or settings.
+
+        If multiple proxies are configured, returns a random one.
+        Stage params take precedence over global settings.
+        """
+        proxies = self.context.params.get("http_proxies") or settings.http_proxies
+        if not proxies:
+            return None
+        if isinstance(proxies, str):
+            return proxies
+        return random.choice(proxies)
+
     @property
     def client(self) -> httpx.Client:
         """Get or create the httpx Client with session state applied."""
         if self._client is None:
+            proxy = self._get_proxy()
+
             self._client = httpx.Client(
                 verify=False,
                 follow_redirects=True,
                 timeout=settings.http_timeout,
+                proxy=proxy,
             )
             self._client.headers["User-Agent"] = settings.user_agent
             if self.context.crawler.stealthy:
@@ -82,7 +99,7 @@ class ContextHttp:
         params: dict[str, Any] | list[tuple[str, Any]] | None = None,
         json_data: dict[str, Any] | None = None,
         allow_redirects: bool = True,
-        timeout: float | None = None,
+        timeout: int | None = None,
         lazy: bool = False,
     ) -> ContextHttpResponse:
         if timeout is None:
@@ -161,7 +178,7 @@ class ContextHttpResponse:
         request: httpx.Request | None = None,
         auth: tuple[str, str] | None = None,
         follow_redirects: bool = True,
-        timeout: float | None = None,
+        timeout: int | None = None,
     ) -> None:
         self.http = http
         self.context = http.context

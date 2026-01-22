@@ -57,8 +57,14 @@ class Settings(BaseSettings):
 
     # HTTP configuration
     http_cache: bool = Field(default=True)
-    http_timeout: float = Field(default=30.0)
-    http_proxy: str | None = Field(default=None, description="HTTP/HTTPS proxy URL")
+    http_timeout: int = Field(default=3600)
+    http_proxies: str | list[str] | None = Field(
+        default=None,
+        description=(
+            "HTTP/HTTPS proxy URL(s). "
+            "Can be a single URL or list of URLs for rotation."
+        ),
+    )
     user_agent: str = Field(
         default="Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.1) "
         f"memorious/{VERSION}"

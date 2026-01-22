@@ -20,10 +20,7 @@ if TYPE_CHECKING:
 
 @register("init")
 def init(context: Context, data: dict[str, Any]) -> None:
-    """Initialize crawler with params and optional proxy configuration.
-
-    Merges stage params into the data dict and configures HTTP proxy
-    if MEMORIOUS_HTTP_PROXY is set and not in debug mode.
+    """Initialize crawler with initial params.
 
     Args:
         context: The crawler context.
@@ -44,21 +41,6 @@ def init(context: Context, data: dict[str, Any]) -> None:
               pass: fetch
         ```
     """
-    # Configure proxy if set
-    proxy = context.settings.http_proxy
-    if proxy and not context.settings.debug:
-        context.http.client._mounts.clear()
-        import httpx
-
-        context.http.client._mounts[httpx.URL("http://")] = httpx.HTTPTransport(
-            proxy=proxy
-        )
-        context.http.client._mounts[httpx.URL("https://")] = httpx.HTTPTransport(
-            proxy=proxy
-        )
-        context.http.save()
-        context.log.info("Configured HTTP proxy", proxy=proxy)
-
     # Merge params into data
     context.emit(data={**data, **ensure_dict(context.params)})
 
