@@ -33,6 +33,8 @@ def extract_xpath(html: HtmlElement, path: str) -> Any:
         'https://example.com'
     """
     result = html.xpath(path)
+    if not result:
+        return
     if isinstance(result, list) and len(result) == 1:
         result = result[0]
     if hasattr(result, "text"):
