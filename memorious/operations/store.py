@@ -219,8 +219,8 @@ def directory(context: Context, data: dict[str, Any]) -> None:
         data: Must contain content_hash from a fetched response.
 
     Params:
-        path: Custom storage path (default: {base_path}/store/{crawler_name}).
-        compute_path: Configure how file paths are computed.
+        path (optional): Custom storage path (default: {base_path}/store/{crawler_name}).
+        compute_path (optional): Configure how file paths are computed.
             method: The path computation method (default: "url_path")
                 - "url_path": Use the URL path
                 - "template": Use Jinja2 template with data context
@@ -307,7 +307,7 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         data: Must contain content_hash from a fetched response.
 
     Params:
-        compute_path: Configure how file keys are computed.
+        compute_path (optional): Configure how file keys are computed.
             method: The path computation method (default: "url_path")
                 - "url_path": Use the URL path
                 - "template": Use Jinja2 template with data context
@@ -318,7 +318,7 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
                     strip_prefix: str - Strip this prefix from the path
                 For template:
                     template: str - Jinja2 template with data context
-        make_entities: Create FTM entities from stored files (default: true)
+        make_entities (optional): Create FTM entities from stored files (default: true)
 
     Example:
         ```yaml
@@ -386,7 +386,7 @@ def store(context: Context, data: dict[str, Any]) -> None:
         data: Must contain content_hash from a fetched response.
 
     Params:
-        operation: Storage operation name (default: "directory").
+        operation (optional): Storage operation name (default: "directory").
             Options: "directory", "lakehouse"
 
     Example:

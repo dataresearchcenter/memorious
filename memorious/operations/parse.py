@@ -13,7 +13,7 @@ from urllib.parse import quote, urljoin
 import jq
 from anystore.logging import get_logger
 from banal import clean_dict, ensure_dict, ensure_list
-from normality import collapse_spaces
+from normality import squash_spaces
 
 from memorious.helpers.dates import iso_date
 from memorious.helpers.pagination import paginate
@@ -80,15 +80,15 @@ def _extract_urls(
                 tag = context.make_key(context.run_id, make_url_key(url))
                 if context.check_tag(tag):
                     continue
-                context.set_tag(tag, None)
+                context.set_tag(tag)
 
                 emit_data = {**data, "url": url}
 
                 if emit_data.get("title") is None:
                     if context.get("link_title", False):
-                        emit_data["title"] = collapse_spaces(element.text_content())
+                        emit_data["title"] = squash_spaces(element.text_content())
                     elif element.get("title"):
-                        emit_data["title"] = collapse_spaces(element.get("title"))
+                        emit_data["title"] = squash_spaces(element.get("title"))
 
                 # Encode non-ASCII characters for HTTP header
                 context.http.client.headers["Referer"] = quote(
@@ -119,9 +119,9 @@ def _extract_metadata(
         for xpath in ensure_list(xpaths):
             for element in ensure_list(html.xpath(xpath)):
                 try:
-                    value = collapse_spaces(element.text_content())
+                    value = squash_spaces(element.text_content())
                 except AttributeError:
-                    value = collapse_spaces(str(element))
+                    value = squash_spaces(str(element))
                 if key in meta_date:
                     value = iso_date(value)
                 if value is not None:
@@ -159,12 +159,12 @@ def parse(context: Context, data: dict[str, Any]) -> None:
         data: Must contain cached HTTP response data.
 
     Params:
-        include_paths: List of XPath expressions to search for URLs.
-        meta: Dict mapping field names to XPath expressions.
-        meta_date: Dict mapping date field names to XPath expressions.
-        store: Rules dict to match responses for storage.
-        schema: FTM schema name for entity extraction.
-        properties: Dict mapping FTM properties to XPath expressions.
+        include_paths (optional): List of XPath expressions to search for URLs.
+        meta (optional): Dict mapping field names to XPath expressions.
+        meta_date (optional): Dict mapping date field names to XPath expressions.
+        store (optional): Rules dict to match responses for storage.
+        schema (optional): FTM schema name for entity extraction.
+        properties (optional): Dict mapping FTM properties to XPath expressions.
 
     Example:
         ```yaml
@@ -219,11 +219,11 @@ def parse_listing(context: Context, data: dict[str, Any]) -> None:
         data: Must contain cached HTTP response data.
 
     Params:
-        items: XPath expression to select item elements.
-        meta: Dict mapping field names to XPath expressions (per item).
-        pagination: Pagination configuration.
-        emit: If True, emit each item's data.
-        parse_html: If True, extract URLs from items (default: True).
+        items (required): XPath expression to select item elements.
+        meta (optional): Dict mapping field names to XPath expressions (per item).
+        pagination (optional): Pagination configuration.
+        emit (optional): If True, emit each item's data.
+        parse_html (optional): If True, extract URLs from items. Default: True.
 
     Example:
         ```yaml
@@ -280,7 +280,7 @@ def parse_jq(context: Context, data: dict[str, Any]) -> None:
         data: Must contain cached HTTP response data.
 
     Params:
-        pattern: jq pattern string to extract data.
+        pattern (required): jq pattern string to extract data.
 
     Example:
         ```yaml
@@ -314,9 +314,9 @@ def parse_csv(context: Context, data: dict[str, Any]) -> None:
         data: Must contain cached HTTP response data.
 
     Params:
-        skiprows: Number of rows to skip at the beginning.
-        delimiter: CSV field delimiter (default: comma).
-        (Other csv.DictReader kwargs are supported)
+        skiprows (optional): Number of rows to skip at the beginning.
+        delimiter (optional): CSV field delimiter (default: comma).
+        (Other csv.DictReader kwargs are also supported)
 
     Example:
         ```yaml
@@ -358,8 +358,8 @@ def parse_xml(context: Context, data: dict[str, Any]) -> None:
         data: Must contain cached HTTP response data.
 
     Params:
-        meta: Dict mapping field names to XPath expressions.
-        meta_date: Dict mapping date field names to XPath expressions.
+        meta (optional): Dict mapping field names to XPath expressions.
+        meta_date (optional): Dict mapping date field names to XPath expressions.
 
     Example:
         ```yaml

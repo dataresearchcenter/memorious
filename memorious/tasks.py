@@ -76,9 +76,10 @@ def execute_stage(job: DatasetJob) -> None:
     try:
         context.execute(payload.get("data", {}))
     except Exception:
-        if not payload.get("continue_on_error", False):
-            crawler.stop()
-            raise
+        pass
+        # if not payload.get("continue_on_error", False):
+        #     crawler.stop()
+        #     raise
 
 
 def defer_stage(

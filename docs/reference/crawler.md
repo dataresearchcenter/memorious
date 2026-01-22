@@ -226,6 +226,27 @@ context.http.save()        # Persist session state
 context.http.reset()       # Clear session state
 ```
 
+### Proxy Configuration
+
+Proxies can be configured globally via `MEMORIOUS_HTTP_PROXIES` or per-stage:
+
+```yaml
+pipeline:
+  fetch:
+    method: fetch
+    params:
+      # Single proxy
+      http_proxies: http://proxy:8080
+
+      # Multiple proxies (random selection per request)
+      http_proxies:
+        - http://proxy1:8080
+        - http://proxy2:8080
+        - socks5://proxy3:1080
+```
+
+Stage-level `http_proxies` overrides the global setting. When multiple proxies are provided, a random one is selected when the HTTP client is created.
+
 ### Request Parameters
 
 | Parameter | Description |

@@ -51,11 +51,11 @@ def regex_groups(context: Context, data: dict[str, Any]) -> None:
         data: Data dict to extract from (modified in place).
 
     Params:
-        <key>: Regex pattern with named groups, or config dict.
+        <key> (required): Regex pattern with named groups, or config dict.
         Config dict supports:
-            pattern/patterns: Single pattern or list of patterns.
-            store_as: Key name for storing the result.
-            split: Separator to split value before matching.
+            pattern/patterns (optional): Single pattern or list of patterns.
+            store_as (optional): Key name for storing the result.
+            split (optional): Separator to split value before matching.
 
     Example:
         ```yaml

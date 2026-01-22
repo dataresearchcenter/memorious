@@ -31,7 +31,7 @@ def clean_html(context: Context, data: dict[str, Any]) -> None:
         data: Must contain cached HTTP response data.
 
     Params:
-        remove_paths: List of XPath expressions for elements to remove.
+        remove_paths (optional): List of XPath expressions for elements to remove.
 
     Example:
         ```yaml
@@ -74,11 +74,11 @@ def clean(context: Context, data: dict[str, Any]) -> None:
         data: Data dict to clean (modified in place).
 
     Params:
-        drop: List of keys to remove from data.
-        defaults: Dict of default values for missing keys.
-        values: Dict for value rewriting (mapping or format string).
-        required: List of required keys (raises MetaDataError if missing).
-        typing: Type casting configuration with ignore list and date kwargs.
+        drop (optional): List of keys to remove from data.
+        defaults (optional): Dict of default values for missing keys.
+        values (optional): Dict for value rewriting (mapping or format string).
+        required (optional): List of required keys (raises MetaDataError if missing).
+        typing (optional): Type casting configuration with ignore list and date kwargs.
 
     Example:
         ```yaml

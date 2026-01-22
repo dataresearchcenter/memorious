@@ -58,8 +58,8 @@ def seed(context: Context, data: dict[str, Any]) -> None:
         data: Values available for URL formatting.
 
     Params:
-        url: Single URL or list of URLs.
-        urls: List of URLs (alternative to `url`).
+        url (optional): Single URL or list of URLs.
+        urls (optional): List of URLs (alternative to `url`).
 
     Example:
         ```yaml
@@ -100,7 +100,7 @@ def enumerate(context: Context, data: dict[str, Any]) -> None:
         data: Base data dict to include in each emission.
 
     Params:
-        items: List of items to enumerate.
+        items (required): List of items to enumerate.
 
     Example:
         ```yaml
@@ -181,11 +181,11 @@ def sequence(context: Context, data: dict[str, Any]) -> None:
         data: May contain "number" to continue a recursive sequence.
 
     Params:
-        start: Starting number (default: 1).
-        stop: Stop number (exclusive).
-        step: Step increment (default: 1, can be negative).
-        delay: If set, use recursive mode with this delay in seconds.
-        tag: If set, emit each number only once across crawler runs.
+        start (optional): Starting number. Default: 1.
+        stop (required): Stop number (exclusive).
+        step (optional): Step increment (can be negative). Default: 1.
+        delay (optional): If set, use recursive mode with this delay in seconds.
+        tag (optional): If set, emit each number only once across crawler runs.
 
     Example:
         ```yaml
@@ -252,13 +252,13 @@ def dates(context: Context, data: dict[str, Any]) -> None:
         data: Base data dict to include in each emission.
 
     Params:
-        format: Date format string (default: "%Y-%m-%d").
-        begin: Begin date string (default: current date).
-        end: End date string (default: current date).
-        days: Number of days per step (default: 0).
-        weeks: Number of weeks per step (default: 0).
-        months: Number of months per step (default: 0).
-        years: Number of years per step (default: 0).
+        format (optional): Date format string. Default: "%Y-%m-%d".
+        begin (optional): Begin date string. Default: current date.
+        end (optional): End date string. Default: current date.
+        days (optional): Number of days per step. Default: 0.
+        weeks (optional): Number of weeks per step. Default: 0.
+        months (optional): Number of months per step. Default: 0.
+        years (optional): Number of years per step. Default: 0.
 
     Example:
         ```yaml

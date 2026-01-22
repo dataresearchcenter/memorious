@@ -13,6 +13,89 @@ Incremental crawling uses a tag-based system to track which items have been succ
 
 This means items are only marked as "processed" after they reach a storage operation, ensuring that failed or incomplete processing doesn't prevent retries.
 
+## Tag System Overview
+
+The tag system is the backbone of memorious's incremental crawling. Tags are key-value pairs stored in a shared backend (S3, PostgreSQL, SQLite, Redis) that enable **coordination between distributed workers**.
+
+### Tag Categories
+
+| Category | Scope | Purpose |
+|----------|-------|---------|
+| **URL Deduplication** | Per-run | Prevent fetching the same URL twice within a crawl |
+| **HTTP Response Cache** | Per-crawler | Enable conditional requests (304 Not Modified) |
+| **Emit Deduplication** | Per-crawler | Skip already-processed items across runs |
+
+### How Tags Flow Through a Crawl
+
+```mermaid
+flowchart TD
+    subgraph "context.emit - called after every stage"
+        E1[emit called] --> E2{Incremental mode?}
+        E2 -->|No| E5[Queue next job]
+        E2 -->|Yes| E3{Emit tag exists?}
+        E3 -->|Yes| E4[Skip - already processed]
+        E3 -->|No| E5
+    end
+
+    subgraph "Fetch Stage"
+        F1[Receive URL] --> F2{HTTP cache tag?}
+        F2 -->|Yes| F3[Conditional request]
+        F2 -->|No| F4[Normal request]
+        F3 --> F5{304?}
+        F5 -->|Yes| F6[Use cached]
+        F5 -->|No| F7[New response]
+        F4 --> F7
+        F7 --> F8[Set HTTP cache tag]
+        F6 --> F9{Redirected?}
+        F8 --> F9
+        F9 -->|Yes| F10[Set URL tag for original]
+        F9 --> F11[context.emit]
+    end
+
+    subgraph "Parse Stage"
+        P1[Find URLs] --> P2{URL tag exists?}
+        P2 -->|Yes| P3[Skip URL]
+        P2 -->|No| P4[Set URL tag]
+        P4 --> P5[context.emit per URL]
+    end
+
+    subgraph "Store Stage"
+        S1[Store data] --> S2[mark_emit_complete]
+        S2 --> S3[Set emit tag]
+    end
+
+    F11 --> E1
+    P5 --> E1
+    E5 -.-> S1
+
+    classDef urlTag fill:#4a9eff,stroke:#2171c7,color:#fff
+    classDef httpTag fill:#22c55e,stroke:#16a34a,color:#fff
+    classDef emitTag fill:#f97316,stroke:#ea580c,color:#fff
+
+    class P2,P4,F10 urlTag
+    class F2,F8 httpTag
+    class E3,S3 emitTag
+
+    subgraph Legend
+        L1[URL dedup tag]:::urlTag
+        L2[HTTP cache tag]:::httpTag
+        L3[Emit dedup tag]:::emitTag
+    end
+```
+
+### Tag Key Formats
+
+```
+# URL deduplication (per-run)
+{crawler}/{run_id}/GET/example.com/path/to/page/a1b2c3d4...
+
+# HTTP response cache (per-crawler)
+{crawler}/GET/example.com/path/to/page/a1b2c3d4...
+
+# Emit deduplication (per-crawler)
+{crawler}/emit/GET/example.com/path/to/page/a1b2c3d4...
+```
+
 ## Enabling Incremental Mode
 
 Incremental mode is **enabled by default**. You can control it via:
@@ -196,3 +279,61 @@ To force a full reprocessing, run without incremental mode:
 ```bash
 memorious run my_crawler.yml --no-incremental
 ```
+
+## Tag Scopes Explained
+
+Understanding tag scopes is crucial for advanced usage:
+
+### Per-Run Tags (URL Deduplication)
+
+**Key format**: `{crawler}/{run_id}/...`
+
+These tags prevent duplicate fetches **within a single crawl run**:
+
+- When parse finds a link, it checks if any worker already queued it
+- When fetch handles a redirect, it marks the original URL
+- **Resets on each run** - URLs can be re-fetched in subsequent runs
+
+This is intentional: the HTTP cache handles cross-run efficiency through conditional requests (304 Not Modified), while URL dedup handles within-run coordination.
+
+### Per-Crawler Tags (HTTP Cache & Emit Dedup)
+
+**Key format**: `{crawler}/...` (no run_id)
+
+These tags persist across runs:
+
+- **HTTP cache**: Stores response metadata (ETag, Last-Modified) for conditional requests
+- **Emit dedup**: Tracks successfully processed items to skip on future runs
+
+### Why URL Dedup is Per-Run
+
+The current design separates concerns:
+
+| Layer | Scope | Handles |
+|-------|-------|---------|
+| URL Dedup | Per-run | Multiple workers finding same link |
+| HTTP Cache | Per-crawler | Avoiding re-download of unchanged content |
+| Emit Dedup | Per-crawler | Avoiding re-processing of same documents |
+
+**Benefits of per-run URL dedup:**
+
+1. **Fresh discovery**: Each run can re-discover the site structure
+2. **Error recovery**: Failed fetches in run 1 are retried in run 2
+3. **Change detection**: Redirects and link changes are noticed
+4. **HTTP cache handles efficiency**: Conditional requests return 304 for unchanged content
+
+**Trade-off**: More requests per run, but most return 304 (fast, no body transfer).
+
+## Flushing Tags
+
+To completely reset incremental state:
+
+```bash
+# Via CLI
+memorious run my_crawler.yml --flush
+
+# Programmatically
+crawler.flush_tags()
+```
+
+This deletes all tags for the crawler, forcing a complete re-crawl and re-processing.

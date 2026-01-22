@@ -105,7 +105,7 @@ def extract(context: Context, data: dict[str, Any]) -> None:
         data: Must contain cached HTTP response data.
 
     Params:
-        wildcards: List of shell-style patterns to filter extracted files.
+        wildcards (optional): List of shell-style patterns to filter extracted files.
 
     Example:
         ```yaml

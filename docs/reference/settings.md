@@ -78,7 +78,18 @@ Environment variables take precedence over Docker secrets. This allows you to ov
 |---------------------|------|---------|-------------|
 | `MEMORIOUS_HTTP_CACHE` | `bool` | `true` | Enable HTTP response caching |
 | `MEMORIOUS_HTTP_TIMEOUT` | `float` | `30.0` | HTTP request timeout in seconds |
+| `MEMORIOUS_HTTP_PROXIES` | `str` or `list[str]` | `None` | HTTP/HTTPS proxy URL(s). Single URL or list for rotation |
 | `MEMORIOUS_USER_AGENT` | `str` | `Mozilla/5.0 ... memorious/{VERSION}` | User-Agent header for HTTP requests |
+
+**Proxy Examples:**
+
+```bash
+# Single proxy
+MEMORIOUS_HTTP_PROXIES=http://proxy:8080
+
+# Multiple proxies (JSON format) - random selection per client
+MEMORIOUS_HTTP_PROXIES='["http://proxy1:8080", "http://proxy2:8080", "socks5://proxy3:1080"]'
+```
 
 ### Storage Configuration
 

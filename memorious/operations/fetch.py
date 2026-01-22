@@ -36,14 +36,14 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
         data: Must contain "url" key with the URL to fetch.
 
     Params:
-        rules: URL/content filtering rules (default: match_all).
-        retry: Number of retry attempts (default: 3).
-        emit_errors: If True, emit data even on HTTP errors (default: False).
-        headers: Extra HTTP headers to send.
-        base_url: Base URL for resolving relative URLs.
-        rewrite: URL rewriting configuration with "method" and "data" keys.
+        rules (optional): URL/content filtering rules. Default: match_all.
+        retry (optional): Number of retry attempts. Default: 3.
+        emit_errors (optional): If True, emit data even on HTTP errors. Default: False.
+        headers (optional): Extra HTTP headers to send.
+        base_url (optional): Base URL for resolving relative URLs.
+        rewrite (optional): URL rewriting configuration with "method" and "data" keys.
             Methods: "template" (Jinja2), "replace" (string replace).
-        pagination: Pagination config with "param" key for page number.
+        pagination (optional): Pagination config with "param" key for page number.
 
     Example:
         ```yaml
@@ -171,11 +171,11 @@ def session(context: Context, data: dict[str, Any]) -> None:
         data: Passed through to next stage.
 
     Params:
-        user: Username for HTTP basic authentication.
-        password: Password for HTTP basic authentication.
-        user_agent: Custom User-Agent header.
-        url: URL to set as Referer header.
-        proxy: Proxy URL for HTTP/HTTPS requests.
+        user (optional): Username for HTTP basic authentication.
+        password (optional): Password for HTTP basic authentication.
+        user_agent (optional): Custom User-Agent header.
+        url (optional): URL to set as Referer header.
+        proxy (optional): Proxy URL for HTTP/HTTPS requests.
 
     Example:
         ```yaml
@@ -257,10 +257,10 @@ def post(context: Context, data: dict[str, Any]) -> None:
         data: Current stage data.
 
     Params:
-        url: Target URL (or use data["url"]).
-        data: Dictionary of form fields to POST.
-        use_data: Map of {post_field: data_key} to include from data dict.
-        headers: Extra HTTP headers.
+        url (optional): Target URL. Default: data["url"].
+        data (optional): Dictionary of form fields to POST.
+        use_data (optional): Map of {post_field: data_key} to include from data dict.
+        headers (optional): Extra HTTP headers.
 
     Example:
         ```yaml
@@ -303,10 +303,10 @@ def post_json(context: Context, data: dict[str, Any]) -> None:
         data: Current stage data.
 
     Params:
-        url: Target URL (or use data["url"]).
-        data: Dictionary to send as JSON body.
-        use_data: Map of {json_field: data_key} to include from data dict.
-        headers: Extra HTTP headers.
+        url (optional): Target URL. Default: data["url"].
+        data (optional): Dictionary to send as JSON body.
+        use_data (optional): Map of {json_field: data_key} to include from data dict.
+        headers (optional): Extra HTTP headers.
 
     Example:
         ```yaml
@@ -348,10 +348,10 @@ def post_form(context: Context, data: dict[str, Any]) -> None:
         data: Current stage data (must have cached HTML response).
 
     Params:
-        form: XPath to locate the form element.
-        data: Additional form fields to add/override.
-        use_data: Map of {form_field: data_key} to include from data dict.
-        headers: Extra HTTP headers.
+        form (optional): XPath to locate the form element.
+        data (optional): Additional form fields to add/override.
+        use_data (optional): Map of {form_field: data_key} to include from data dict.
+        headers (optional): Extra HTTP headers.
 
     Example:
         ```yaml

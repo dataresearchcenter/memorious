@@ -168,9 +168,8 @@ pipeline:
   init:
     method: dates
     params:
-      begin: "2024-01-01"
-      end: "2024-12-31"
-      days: 1
+      end: "2020-01-01"  # Iterate backwards from now to 2020
+      months: 1
     handle:
       pass: seed
 
@@ -182,6 +181,14 @@ pipeline:
       pass: fetch
   # ... rest of pipeline
 ```
+
+The `dates` operation emits `date` and `date_iso` for each step. Direction is automatic:
+
+- `begin > end`: iterates backwards
+- `begin < end`: iterates forwards
+- Both default to today if not specified (emits only today)
+
+Supports `days`, `weeks`, `months`, and `years` intervals.
 
 ## Rules
 
