@@ -17,6 +17,7 @@ from memorious.helpers.forms import extract_form
 from memorious.helpers.rule import parse_rule
 from memorious.helpers.template import render_template
 from memorious.operations import register
+from memorious.util import make_url_key
 
 if TYPE_CHECKING:
     from memorious.logic.context import Context
@@ -145,8 +146,8 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
 
         data.update(result.serialize())
         if url != result.url:
-            tag = context.make_key(context.run_id, url)
-            context.set_tag(tag, None)
+            tag = context.make_key(context.run_id, make_url_key(url))
+            context.set_tag(tag)
         context.emit(data=data)
     except httpx.HTTPError as ce:
         retries = int(context.get("retry", 3))

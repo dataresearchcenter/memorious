@@ -6,7 +6,7 @@ import os
 import random
 import shutil
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from tempfile import mkdtemp
@@ -233,10 +233,12 @@ class Context:
     def emit_exception(self, exc: Exception) -> None:
         self.log.exception(str(exc))
 
-    def set_tag(self, key: str, value: Any) -> None:
+    def set_tag(self, key: str, value: Any = None) -> None:
         if not key or not key.strip():
             self.log.warning("Ignoring empty tag key")
             return
+        if value is None:
+            value = datetime.now(timezone.utc)
         self.tags.put(self.make_key(key), value)
 
     def get_tag(self, key: str) -> Any:

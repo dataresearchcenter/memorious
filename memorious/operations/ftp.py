@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from memorious.core import get_rate_limit
 from memorious.operations import register
 from memorious.settings import Settings
+from memorious.util import make_url_key
 
 settings = Settings()
 
@@ -32,7 +33,8 @@ def ftp_fetch(context, data):
     limit = limit / 60  # per minute to per second for stricter enforcement
     rate_limit = get_rate_limit(resource, limit=limit, interval=1, unit=1)
 
-    cached = context.get_tag(url)
+    tag_key = make_url_key(url, method="FTP")
+    cached = context.get_tag(tag_key)
     if cached is not None:
         context.emit(rule="pass", data=cached)
         return
@@ -47,7 +49,7 @@ def ftp_fetch(context, data):
                 "content_hash": context.store_data(data=resp.content),
             }
         )
-        context.set_tag(url, data)
+        context.set_tag(tag_key, data)
         context.emit(rule="pass", data=data)
     else:
         context.enforce_rate_limit(rate_limit)

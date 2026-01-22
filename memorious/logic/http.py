@@ -10,11 +10,10 @@ from functools import cached_property
 from hashlib import sha1
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ContextManager
-from urllib.parse import unquote, urlparse, urlsplit
+from urllib.parse import unquote, urlparse
 
 import httpx
-from anystore.util import join_relpaths as make_key
-from banal import hash_data, is_mapping
+from banal import is_mapping
 from lxml import etree, html
 from normality import guess_file_encoding, stringify
 from rigour.mime import normalize_mimetype, parse_mimetype
@@ -25,6 +24,7 @@ from memorious.helpers.dates import parse_date
 from memorious.helpers.ua import UserAgent
 from memorious.logic.mime import NON_HTML
 from memorious.model.session import SessionModel
+from memorious.util import make_url_key
 
 if TYPE_CHECKING:
     from memorious.logic.context import Context
@@ -288,14 +288,11 @@ class ContextHttpResponse:
         if self._request_id is not None:
             return self._request_id
         if self.request is not None:
-            url = str(self.request.url)
-            url_parts = urlsplit(url)
-            parts = [self.request.method, url_parts.netloc, url_parts.path]
-            if url_parts.query:
-                parts.append(hash_data(url_parts.query))
-            if self.request.content:
-                parts.append(hash_data(self.request.content))
-            return make_key(*parts, hash_data(url))
+            return make_url_key(
+                str(self.request.url),
+                method=self.request.method,
+                content=self.request.content or None,
+            )
         return None
 
     @property
