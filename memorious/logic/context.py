@@ -7,10 +7,10 @@ import random
 import shutil
 from copy import deepcopy
 from datetime import datetime, timezone
-from io import BytesIO
+from io import BufferedReader, BytesIO
 from pathlib import Path
 from tempfile import mkdtemp
-from typing import IO, Any, ContextManager, overload
+from typing import IO, Any, BinaryIO, ContextManager, overload
 
 from anystore.logging import get_logger
 from anystore.serialize import to_store
@@ -292,7 +292,10 @@ class Context:
         return file_info.checksum
 
     def store_data(self, data: Any, checksum: str | None = None) -> str:
-        fh = BytesIO(to_store(data))
+        if isinstance(data, (BinaryIO, BytesIO, BufferedReader)):
+            fh = data
+        else:
+            fh = BytesIO(to_store(data))
         return self.archive.write_blob(fh, checksum=checksum)
 
     def open(self, content_hash: str) -> ContextManager[IO[bytes]]:
