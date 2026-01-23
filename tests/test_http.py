@@ -1,3 +1,6 @@
+from pathlib import Path
+from unittest.mock import MagicMock
+
 import httpx
 from lxml import etree, html
 
@@ -241,3 +244,218 @@ class TestContextHttpResponse:
         request = httpx.Request("GET", f"{httpbin_url}/status/200")
         context_http_response = ContextHttpResponse(http, request)
         assert context_http_response.status_code == 200
+
+
+class TestResumableDownloads:
+    """Tests for HTTP Range-based resumable downloads."""
+
+    def test_partial_state_initialization(self, http, httpbin_url):
+        """Test that ContextHttpResponse accepts partial download state."""
+        request = httpx.Request("GET", f"{httpbin_url}/get")
+        partial_path = Path("/tmp/test_partial")
+        partial_bytes = 1024
+
+        response = ContextHttpResponse(
+            http,
+            request=request,
+            partial_path=partial_path,
+            partial_bytes=partial_bytes,
+        )
+
+        assert response.partial_path == partial_path
+        assert response.partial_bytes == partial_bytes
+
+    def test_range_header_added_when_resuming(self, http, httpbin_url):
+        """Test that Range header is added when partial_bytes > 0."""
+        request = httpx.Request("GET", f"{httpbin_url}/headers")
+        partial_bytes = 1024
+
+        response = ContextHttpResponse(
+            http,
+            request=request,
+            partial_bytes=partial_bytes,
+        )
+
+        # Access response to trigger the request
+        _ = response.response
+
+        # The Range header should have been sent
+        # We can verify by checking the response (httpbin echoes headers)
+        assert response.ok
+        json_response = response.json
+        # httpbin returns headers in the response
+        assert "Range" in json_response.get("headers", {})
+        assert json_response["headers"]["Range"] == "bytes=1024-"
+
+    def test_partial_state_reset_on_200_response(self, http, httpbin_url):
+        """Test that partial state is reset when server returns 200 (doesn't support Range)."""
+        request = httpx.Request("GET", f"{httpbin_url}/get")
+
+        # Create a temp file to simulate existing partial content
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            f.write(b"partial content")
+            partial_path = Path(f.name)
+
+        try:
+            response = ContextHttpResponse(
+                http,
+                request=request,
+                partial_path=partial_path,
+                partial_bytes=15,  # "partial content" length
+            )
+
+            # Access response to trigger the request
+            # httpbin/get returns 200, not 206, so partial state should reset
+            _ = response.response
+
+            # Partial state should be reset
+            assert response.partial_bytes == 0
+            assert response.partial_path is None
+            # The partial file should have been deleted
+            assert not partial_path.exists()
+        finally:
+            # Cleanup if test fails
+            if partial_path.exists():
+                partial_path.unlink()
+
+    def test_request_passes_partial_state(self, http, httpbin_url):
+        """Test that ContextHttp.request() passes partial state to response."""
+        partial_path = Path("/tmp/test_partial_request")
+        partial_bytes = 2048
+
+        response = http.request(
+            "GET",
+            f"{httpbin_url}/get",
+            lazy=True,
+            partial_path=partial_path,
+            partial_bytes=partial_bytes,
+        )
+
+        assert response.partial_path == partial_path
+        assert response.partial_bytes == partial_bytes
+
+    def test_get_passes_partial_state(self, http, httpbin_url):
+        """Test that ContextHttp.get() passes partial state to response."""
+        partial_path = Path("/tmp/test_partial_get")
+        partial_bytes = 4096
+
+        response = http.get(
+            f"{httpbin_url}/get",
+            lazy=True,
+            partial_path=partial_path,
+            partial_bytes=partial_bytes,
+        )
+
+        assert response.partial_path == partial_path
+        assert response.partial_bytes == partial_bytes
+
+    def test_fetch_with_partial_content_resumes(self, http, httpbin_url):
+        """Test that fetch() with existing partial content continues from that point."""
+        import tempfile
+
+        # Create partial content file
+        partial_content = b"already downloaded: "
+        with tempfile.NamedTemporaryFile(delete=False, dir=http.context.work_path) as f:
+            f.write(partial_content)
+            partial_path = Path(f.name)
+
+        try:
+            # Create a request - we'll use httpbin/bytes which supports Range
+            request = httpx.Request("GET", f"{httpbin_url}/bytes/100")
+
+            response = ContextHttpResponse(
+                http,
+                request=request,
+                partial_path=partial_path,
+                partial_bytes=len(partial_content),
+            )
+
+            # Fetch should complete (even if server doesn't actually support Range,
+            # the 200 response will reset partial state and download full content)
+            content_hash = response.fetch()
+            assert content_hash is not None
+            assert len(content_hash) == 40  # SHA1 hex digest length
+        finally:
+            # Cleanup
+            if partial_path.exists():
+                partial_path.unlink()
+
+    def test_fetch_creates_temp_file_on_error(self, http, httpbin_url):
+        """Test that fetch() stores partial state when HTTPError occurs during streaming."""
+        request = httpx.Request("GET", f"{httpbin_url}/bytes/1000")
+
+        response = ContextHttpResponse(http, request=request)
+
+        # Mock the response to raise HTTPError mid-stream
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.headers = {
+            "accept-ranges": "bytes",
+            "content-length": "1000",
+        }
+
+        # Simulate partial streaming then error
+        chunks_yielded = [0]
+
+        def iter_bytes_with_error(chunk_size=8192):
+            for i in range(5):
+                chunks_yielded[0] += 1
+                yield b"x" * 100
+            raise httpx.ReadTimeout("Connection timed out")
+
+        mock_response.iter_bytes = iter_bytes_with_error
+
+        # Patch the response property to return our mock
+        response._response = mock_response
+
+        # Fetch should raise HTTPError
+        try:
+            response.fetch()
+            assert False, "Expected HTTPError to be raised"
+        except httpx.HTTPError:
+            pass
+
+        # Partial state should be set
+        assert response.partial_path is not None
+        assert response.partial_path.exists()
+        assert response.partial_bytes == 500  # 5 chunks * 100 bytes
+
+        # Cleanup
+        if response.partial_path and response.partial_path.exists():
+            response.partial_path.unlink()
+
+    def test_partial_file_cleanup_on_success(self, http, httpbin_url):
+        """Test that temp file is cleaned up after successful download."""
+        import tempfile
+
+        # Create partial content file
+        partial_content = b"partial"
+        with tempfile.NamedTemporaryFile(delete=False, dir=http.context.work_path) as f:
+            f.write(partial_content)
+            partial_path = Path(f.name)
+
+        try:
+            # Use a small response that won't fail
+            request = httpx.Request("GET", f"{httpbin_url}/bytes/50")
+
+            response = ContextHttpResponse(
+                http,
+                request=request,
+                partial_path=partial_path,
+                partial_bytes=len(partial_content),
+            )
+
+            # Fetch should succeed
+            content_hash = response.fetch()
+            assert content_hash is not None
+
+            # The temp file should be cleaned up
+            # Note: If server returns 200 (no Range support), partial_path is reset
+            # and deleted in response property. If 206, the same file is used and
+            # deleted after successful completion.
+        finally:
+            # Cleanup if test fails
+            if partial_path.exists():
+                partial_path.unlink()

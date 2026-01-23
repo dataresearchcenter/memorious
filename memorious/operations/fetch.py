@@ -6,6 +6,7 @@ and managing HTTP sessions in crawlers.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
@@ -128,17 +129,35 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
         return
 
     attempt = data.pop("retry_attempt", 1)
+
+    # Extract partial download state from previous attempt (if any)
+    partial_path_str = data.pop("_partial_path", None)
+    partial_bytes = data.pop("_partial_bytes", 0)
+    partial_path = Path(partial_path_str) if partial_path_str else None
+
+    result = None
     try:
-        result = context.http.get(url, lazy=True)
+        result = context.http.get(
+            url,
+            lazy=True,
+            partial_path=partial_path,
+            partial_bytes=partial_bytes,
+        )
         rules = context.get("rules", {"match_all": {}})
         if not parse_rule(rules).apply(result):
             context.log.info("Fetch skip (rule)", url=result.url)
+            # Cleanup partial file if skipping
+            if partial_path and partial_path.exists():
+                partial_path.unlink(missing_ok=True)
             return
 
         if not result.ok:
             context.emit_warning(
                 "Fetch fail", url=result.url, status=result.status_code
             )
+            # Cleanup partial file on HTTP error status
+            if partial_path and partial_path.exists():
+                partial_path.unlink(missing_ok=True)
             if not context.params.get("emit_errors", False):
                 return
         else:
@@ -154,8 +173,24 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
         if retries >= attempt:
             context.log.warning("Retry", url=url, error=str(ce), attempt=attempt)
             data["retry_attempt"] = attempt + 1
+
+            if result is not None:
+                # Pass partial download state for resume on retry
+                if result.partial_path and result.partial_path.exists():
+                    data["_partial_path"] = str(result.partial_path)
+                    data["_partial_bytes"] = result.partial_bytes
+                    context.log.info(
+                        "Resumable download state saved",
+                        url=url,
+                        bytes_received=result.partial_bytes,
+                    )
+
             context.recurse(data=data, delay=2**attempt)
         else:
+            if result is not None:
+                # Cleanup partial file on final failure
+                if result.partial_path and result.partial_path.exists():
+                    result.partial_path.unlink(missing_ok=True)
             context.emit_warning("Fetch fail", url=url, error=str(ce))
 
 

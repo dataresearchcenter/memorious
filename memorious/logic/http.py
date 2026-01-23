@@ -101,6 +101,8 @@ class ContextHttp:
         allow_redirects: bool = True,
         timeout: int | None = None,
         lazy: bool = False,
+        partial_path: Path | None = None,
+        partial_bytes: int = 0,
     ) -> ContextHttpResponse:
         if timeout is None:
             timeout = settings.http_timeout
@@ -127,6 +129,8 @@ class ContextHttp:
             auth=auth,
             follow_redirects=allow_redirects,
             timeout=timeout,
+            partial_path=partial_path,
+            partial_bytes=partial_bytes,
         )
         if not lazy:
             response.fetch()
@@ -179,6 +183,8 @@ class ContextHttpResponse:
         auth: tuple[str, str] | None = None,
         follow_redirects: bool = True,
         timeout: int | None = None,
+        partial_path: Path | None = None,
+        partial_bytes: int = 0,
     ) -> None:
         self.http = http
         self.context = http.context
@@ -194,6 +200,9 @@ class ContextHttpResponse:
         self._encoding: str | None = None
         self._content_hash: str | None = None
         self.retrieved_at: str | None = None
+        # Partial download state for resumable downloads
+        self.partial_path = partial_path
+        self.partial_bytes = partial_bytes
 
     @property
     def use_cache(self) -> bool:
@@ -225,6 +234,10 @@ class ContextHttpResponse:
                 if etag:
                     extra_headers["If-None-Match"] = etag
 
+            # Add Range header for resumable downloads
+            if self.partial_bytes > 0:
+                extra_headers["Range"] = f"bytes={self.partial_bytes}-"
+
             self._rate_limit(str(request.url))
 
             # Merge extra headers with request headers for conditional requests
@@ -251,7 +264,19 @@ class ContextHttpResponse:
                 )
                 response.close()
                 self.apply_data(existing)
+            elif self.partial_bytes > 0 and response.status_code == 200:
+                # Server doesn't support Range requests - reset partial state
+                self.context.log.debug(
+                    "Server does not support Range requests, restarting download",
+                    url=str(response.url),
+                )
+                self.partial_bytes = 0
+                if self.partial_path and self.partial_path.exists():
+                    self.partial_path.unlink()
+                self.partial_path = None
+                self._response = response
             else:
+                # Normal response (200) or partial content (206)
                 self._response = response
 
             # Update the serialized session with cookies etc.
@@ -259,23 +284,73 @@ class ContextHttpResponse:
         return self._response
 
     def fetch(self) -> str | None:
-        """Fetch response and store in archive. Returns content_hash."""
+        """Fetch response and store in archive. Returns content_hash.
+
+        Supports resumable downloads via HTTP Range headers. If a download
+        fails mid-stream and the server supports Range requests, the partial
+        content is preserved and the download can be resumed from where it
+        left off on retry.
+        """
         if self._content_hash is not None:
             return self._content_hash
 
         if self.response is None:
             return None
 
-        # Stream response, computing hash and collecting chunks
-        content_hash = sha1()
-        chunks: list[bytes] = []
-        for chunk in self.response.iter_bytes(chunk_size=8192):
-            content_hash.update(chunk)
-            chunks.append(chunk)
+        # Check if server supports Range requests for resumable downloads
+        accept_ranges = self.response.headers.get("accept-ranges", "").lower()
+        content_length_str = self.response.headers.get("content-length", "0")
+        try:
+            content_length = int(content_length_str)
+        except ValueError:
+            content_length = 0
+        supports_range = accept_ranges == "bytes" and content_length > 0
 
-        # Store raw bytes in archive
-        self._content_hash = content_hash.hexdigest()
-        self.context.store_data(b"".join(chunks), checksum=self._content_hash)
+        # Use temp file for streaming (allows resume on failure)
+        work_path = Path(self.context.work_path)
+        request_hash = sha1((self.request_id or "").encode()).hexdigest()[:16]
+        temp_path = work_path / f"partial_{request_hash}"
+
+        # Determine starting position and temp file path
+        start_byte = 0
+        if self.partial_path and self.partial_path.exists():
+            start_byte = self.partial_path.stat().st_size
+            temp_path = self.partial_path
+
+        content_hash = sha1()
+
+        # If resuming, hash existing content first
+        if start_byte > 0 and temp_path.exists():
+            with open(temp_path, "rb") as f:
+                while chunk := f.read(8192):
+                    content_hash.update(chunk)
+
+        try:
+            # Stream to temp file (append if resuming, write if fresh)
+            mode = "ab" if start_byte > 0 else "wb"
+            with open(temp_path, mode) as f:
+                for chunk in self.response.iter_bytes(chunk_size=8192):
+                    content_hash.update(chunk)
+                    f.write(chunk)
+
+            # Complete - store in archive
+            self._content_hash = content_hash.hexdigest()
+            self.context.store_data(temp_path.open("rb"), checksum=self._content_hash)
+
+            # Cleanup temp file on success
+            temp_path.unlink(missing_ok=True)
+
+        except httpx.HTTPError:
+            # Store partial state for retry if server supports Range requests
+            if supports_range and temp_path.exists():
+                self.partial_path = temp_path
+                self.partial_bytes = temp_path.stat().st_size
+                self.context.log.debug(
+                    "Partial download stored for resume",
+                    url=self.url,
+                    bytes_received=self.partial_bytes,
+                )
+            raise  # Re-raise for fetch.py to handle retry
 
         # Cache HTTP metadata via tags for conditional requests
         if self.http.cache and self.ok and self.request_id:
