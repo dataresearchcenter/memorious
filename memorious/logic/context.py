@@ -189,7 +189,11 @@ class Context:
             stage=stage,
             data=data,
             run_id=self.run_id,
-            incremental=self.incremental or True,
+            incremental=(
+                self.incremental
+                if self.incremental is not None
+                else self.settings.incremental
+            ),
             continue_on_error=self.continue_on_error or False,
         )
 

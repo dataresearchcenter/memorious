@@ -14,12 +14,15 @@ from openaleph_procrastinate.model import DatasetJob
 from openaleph_procrastinate.tasks import task
 
 from memorious.logic.crawler import get_crawler
+from memorious.settings import Settings
 
 log = get_logger(__name__)
 
 # Create the procrastinate app
 app: App = make_app("memorious.tasks")
 sync_app: App = make_app("memorious.tasks", sync=True)
+
+settings = Settings()
 
 
 @task(app=app, retry=3)
@@ -67,7 +70,7 @@ def execute_stage(job: DatasetJob) -> None:
     state = {
         "dataset": dataset,
         "run_id": run_id,
-        "incremental": payload.get("incremental", True),
+        "incremental": payload.get("incremental", settings.incremental),
         "continue_on_error": payload.get("continue_on_error", False),
     }
     context = Context(crawler, stage, state)
@@ -88,7 +91,7 @@ def defer_stage(
     run_id: str,
     config_file: str,
     data: dict[str, Any],
-    incremental: bool = True,
+    incremental: bool = settings.incremental,
     continue_on_error: bool = False,
     priority: int = 50,
 ) -> None:
