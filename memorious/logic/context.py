@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from io import BufferedReader, BytesIO
 from pathlib import Path
 from tempfile import mkdtemp
-from typing import IO, Any, BinaryIO, ContextManager, overload
+from typing import IO, TYPE_CHECKING, Any, BinaryIO, ContextManager, cast, overload
 
 from anystore.logging import get_logger
 from anystore.serialize import to_store
@@ -25,60 +25,85 @@ from structlog.stdlib import BoundLogger
 
 from memorious.core import get_cache, get_tags, settings
 from memorious.logic.check import ContextCheck
-from memorious.logic.crawler import Crawler
-from memorious.logic.http import ContextHttp
-from memorious.model.stage import CrawlerStage
 from memorious.settings import Settings
 from memorious.util import make_url_key
+
+if TYPE_CHECKING:
+    from memorious.logic.crawler import Crawler
+    from memorious.logic.http import ContextHttp
+    from memorious.model.stage import CrawlerStage
 
 DEFAULT_ORIGIN = "memorious"
 CACHE_ORIGIN = "memorious-cache"
 
 
-class Context:
-    """Provides state tracking and methods for operation interactions."""
+class BaseContext:
+    """Base context providing storage, caching, and HTTP functionality.
 
-    crawler: Crawler
-    stage: CrawlerStage
-    state: dict[str, Any]
-    params: dict[str, Any]
-    incremental: bool | None
-    continue_on_error: bool | None
+    This class provides the shared functionality for both full crawler contexts
+    and lightweight standalone fetch contexts.
+    """
+
+    dataset: str
     run_id: str
     work_path: str
+    incremental: bool
+    params: dict[str, Any]
     log: BoundLogger
     http: ContextHttp
     check: ContextCheck
     settings: Settings
     tags: Tags
     archive: ArchiveRepository
-    entities: EntityRepository
     cache: BaseStore
+    _stealthy: bool
 
-    def __init__(self, crawler: Crawler, stage: CrawlerStage, state: dict[str, Any]):
-        self.crawler = crawler
-        self.stage = stage
-        self.state = state
-        self.params = stage.params
-        self.incremental = state.get("incremental")
-        self.continue_on_error = state.get("continue_on_error")
-        self.run_id = state.get("run_id") or ensure_uuid()
+    def __init__(
+        self,
+        dataset: str,
+        run_id: str | None = None,
+        incremental: bool = False,
+        params: dict[str, Any] | None = None,
+        stealthy: bool = False,
+        logger_name: str | None = None,
+    ):
+        """Initialize the base context.
+
+        Args:
+            dataset: Dataset/crawler name used for namespacing storage.
+            run_id: Unique run identifier (default: auto-generated UUID).
+            incremental: Skip already-processed items (default: False).
+            params: Configuration parameters (default: empty dict).
+            stealthy: Use random user agents (default: False).
+            logger_name: Name for the logger (default: dataset name).
+        """
+        from memorious.logic.http import ContextHttp
+
+        self.dataset = dataset
+        self.run_id = run_id or ensure_uuid()
         self.work_path = mkdtemp()
+        self.incremental = incremental
+        self.params = params or {}
+        self._stealthy = stealthy
+
         self.log = get_logger(
-            "%s.%s" % (crawler.name, stage.name),
-            dataset=crawler.name,
-            stage=stage.name,
+            logger_name or dataset,
+            dataset=dataset,
             run_id=self.run_id,
         )
 
-        self.settings = settings
-        self.archive = get_archive(self.crawler.name)
-        self.entities = get_entities(self.crawler.name)
-        self.tags = get_tags(self.crawler.name)
+        self.settings = cast(Settings, settings)
+        self.archive = get_archive(dataset)
+        self.tags = get_tags(dataset)
         self.cache = get_cache()
 
         self.http = ContextHttp(self)
         self.check = ContextCheck(self)
+
+    @property
+    def stealthy(self) -> bool:
+        """Whether to use random user agents for HTTP requests."""
+        return self._stealthy
 
     def get(self, name: str, default: Any = None) -> Any:
         """Get a configuration value and expand environment variables."""
@@ -94,11 +119,11 @@ class Context:
     def make_key(self, *, prefix: str | None = ...) -> None: ...
 
     def make_key(self, *parts: str, prefix: str | None = None) -> str | None:
-        """Create a namespaced key with the crawler name prefix.
+        """Create a namespaced key with the dataset name prefix.
 
         Args:
             *parts: Key parts to join. If empty/None, returns None.
-            prefix: Optional prefix added after crawler name but not part
+            prefix: Optional prefix added after dataset name but not part
                 of the None check. Useful for categorizing keys (e.g. "inc", "emit").
 
         Returns:
@@ -107,11 +132,135 @@ class Context:
         key = make_key(*parts)
         if key is None:
             return None
-        if key.startswith(self.crawler.name):  # erf
-            key = key[len(self.crawler.name) + 1 :]
+        if key.startswith(self.dataset):  # erf
+            key = key[len(self.dataset) + 1 :]
         if prefix:
             key = make_key(prefix, key)
-        return make_key(self.crawler.name, key)
+        return make_key(self.dataset, key)
+
+    def set_tag(self, key: str, value: Any = None) -> None:
+        if not key or not key.strip():
+            self.log.warning("Ignoring empty tag key")
+            return
+        if value is None:
+            value = datetime.now(timezone.utc)
+        self.tags.put(self.make_key(key), value)
+
+    def get_tag(self, key: str) -> Any:
+        if not key or not key.strip():
+            self.log.warning("Ignoring empty tag key")
+            return None
+        return self.tags.get(self.make_key(key))
+
+    def check_tag(self, key: str) -> bool:
+        if not key or not key.strip():
+            self.log.warning("Ignoring empty tag key")
+            return False
+        return self.tags.exists(self.make_key(key))
+
+    def skip_incremental(self, *criteria: str) -> bool:
+        """Perform an incremental check on a set of criteria.
+
+        This can be used to execute a part of a crawler only once per an
+        interval (which is specified by the ``expire`` setting). If the
+        operation has already been performed (and should thus be skipped),
+        this will return ``True``. If the operation needs to be executed,
+        the returned value will be ``False``.
+        """
+        if not self.incremental:
+            return False
+
+        key = self.make_key(*criteria, prefix="inc")
+        if key is None:
+            return False
+
+        if self.check_tag(key):
+            return True
+
+        self.set_tag(key, "inc")
+        return False
+
+    def store_file(
+        self,
+        file_path: str | Path,
+        origin: str | None = DEFAULT_ORIGIN,
+        checksum: str | None = None,
+    ) -> str:
+        """Put a file into permanent storage so it can be visible to other stages."""
+        file_info = self.archive.store(
+            file_path, checksum=checksum, origin=origin or DEFAULT_ORIGIN
+        )
+        return file_info.checksum
+
+    def store_data(self, data: Any, checksum: str | None = None) -> str:
+        if isinstance(data, (BinaryIO, BytesIO, BufferedReader)):
+            fh = data
+        else:
+            fh = BytesIO(to_store(data))
+        return self.archive.write_blob(fh, checksum=checksum)
+
+    def open(self, content_hash: str) -> ContextManager[IO[bytes]]:
+        return self.archive.open(content_hash)
+
+    def local_path(self, content_hash: str) -> ContextManager[Path]:
+        return self.archive.local_path(content_hash)
+
+    def enforce_rate_limit(self, rate_limit: RateLimit) -> None:
+        """
+        Enforce rate limit for a resource.
+
+        Updates the rate limit counter and blocks if limit exceeded.
+        """
+        rate_limit.update()
+        if not rate_limit.check():
+            rate_limit.comply()
+
+    def close(self) -> None:
+        """Clean up resources."""
+        self.http.save()
+        shutil.rmtree(self.work_path, ignore_errors=True)
+
+
+class MemoriousContext(BaseContext):
+    """Full crawler context with pipeline operations.
+
+    Provides state tracking and methods for crawler operation interactions,
+    including emit/recurse for pipeline stage transitions.
+    """
+
+    crawler: Crawler
+    stage: CrawlerStage
+    state: dict[str, Any]
+    continue_on_error: bool | None
+    entities: EntityRepository
+
+    def __init__(self, crawler: Crawler, stage: CrawlerStage, state: dict[str, Any]):
+        # Initialize base with crawler-derived values
+        super().__init__(
+            dataset=crawler.name,
+            run_id=state.get("run_id"),
+            incremental=state.get("incremental") or False,
+            params=stage.params,
+            stealthy=crawler.stealthy,
+            logger_name=f"{crawler.name}.{stage.name}",
+        )
+
+        # Update logger with stage info
+        self.log = get_logger(
+            "%s.%s" % (crawler.name, stage.name),
+            dataset=crawler.name,
+            stage=stage.name,
+            run_id=self.run_id,
+        )
+
+        # Crawler-specific attributes
+        self.crawler = crawler
+        self.stage = stage
+        self.state = state
+        self.continue_on_error = state.get("continue_on_error")
+
+        # Entity storage (crawler-only)
+        self.entities = get_entities(crawler.name)
 
     def _make_emit_cache_key(self, data: dict[str, Any]) -> str | None:
         """Generate a cache key for incremental emit tracking.
@@ -237,73 +386,6 @@ class Context:
     def emit_exception(self, exc: Exception) -> None:
         self.log.exception(str(exc))
 
-    def set_tag(self, key: str, value: Any = None) -> None:
-        if not key or not key.strip():
-            self.log.warning("Ignoring empty tag key")
-            return
-        if value is None:
-            value = datetime.now(timezone.utc)
-        self.tags.put(self.make_key(key), value)
-
-    def get_tag(self, key: str) -> Any:
-        if not key or not key.strip():
-            self.log.warning("Ignoring empty tag key")
-            return None
-        return self.tags.get(self.make_key(key))
-
-    def check_tag(self, key: str) -> bool:
-        if not key or not key.strip():
-            self.log.warning("Ignoring empty tag key")
-            return False
-        return self.tags.exists(self.make_key(key))
-
-    def skip_incremental(self, *criteria: str) -> bool:
-        """Perform an incremental check on a set of criteria.
-
-        This can be used to execute a part of a crawler only once per an
-        interval (which is specified by the ``expire`` setting). If the
-        operation has already been performed (and should thus be skipped),
-        this will return ``True``. If the operation needs to be executed,
-        the returned value will be ``False``.
-        """
-        if not self.incremental:
-            return False
-
-        key = self.make_key(*criteria, prefix="inc")
-        if key is None:
-            return False
-
-        if self.check_tag(key):
-            return True
-
-        self.set_tag(key, "inc")
-        return False
-
-    def store_file(
-        self,
-        file_path: str | Path,
-        origin: str | None = DEFAULT_ORIGIN,
-        checksum: str | None = None,
-    ) -> str:
-        """Put a file into permanent storage so it can be visible to other stages."""
-        file_info = self.archive.store(
-            file_path, checksum=checksum, origin=origin or DEFAULT_ORIGIN
-        )
-        return file_info.checksum
-
-    def store_data(self, data: Any, checksum: str | None = None) -> str:
-        if isinstance(data, (BinaryIO, BytesIO, BufferedReader)):
-            fh = data
-        else:
-            fh = BytesIO(to_store(data))
-        return self.archive.write_blob(fh, checksum=checksum)
-
-    def open(self, content_hash: str) -> ContextManager[IO[bytes]]:
-        return self.archive.open(content_hash)
-
-    def local_path(self, content_hash: str) -> ContextManager[Path]:
-        return self.archive.local_path(content_hash)
-
     def dump_state(self) -> dict[str, Any]:
         state = deepcopy(self.state)
         state["dataset"] = self.crawler.name
@@ -313,7 +395,7 @@ class Context:
     @classmethod
     def from_state(
         cls, state: dict[str, Any], stage: str, config_file: str
-    ) -> "Context":
+    ) -> "MemoriousContext":
         """Create a Context from serialized state.
 
         Args:
@@ -329,15 +411,65 @@ class Context:
             raise RuntimeError("[%r] has no stage: %s" % (crawler, stage))
         return cls(crawler, stage_obj, state)
 
-    def enforce_rate_limit(self, rate_limit: RateLimit) -> None:
-        """
-        Enforce rate limit for a resource.
-
-        Updates the rate limit counter and blocks if limit exceeded.
-        """
-        rate_limit.update()
-        if not rate_limit.check():
-            rate_limit.comply()
-
     def __repr__(self) -> str:
         return "<Context(%r, %r)>" % (self.crawler, self.stage)
+
+
+class FetchContext(BaseContext):
+    """Lightweight context for standalone HTTP fetching without a crawler.
+
+    This context provides the HTTP client, archive storage, and caching
+    functionality without requiring a full crawler configuration.
+
+    Example:
+        >>> with FetchContext(dataset="my-scraper") as ctx:
+        ...     response = ctx.http.get("https://example.com")
+        ...     print(response.json)
+    """
+
+    def __init__(
+        self,
+        dataset: str = "fetch",
+        cache: bool = True,
+        proxies: str | list[str] | None = None,
+        timeout: int | None = None,
+        user_agent: str | None = None,
+        stealthy: bool = False,
+        incremental: bool = True,
+    ):
+        """Initialize a standalone fetch context.
+
+        Args:
+            dataset: Dataset name for archive namespace (default: "fetch").
+            cache: Enable HTTP caching with 304 responses (default: True).
+            proxies: Proxy URL or list of proxy URLs for rotation.
+            timeout: HTTP request timeout in seconds.
+            user_agent: Custom User-Agent header.
+            stealthy: Use random user agents (default: False).
+            incremental: Enable incremental state tracking (default: True).
+        """
+        # Build params from arguments
+        params: dict[str, Any] = {"cache": cache}
+        if proxies:
+            params["http_proxies"] = proxies
+        if timeout:
+            params["http_timeout"] = timeout
+        if user_agent:
+            params["user_agent"] = user_agent
+
+        super().__init__(
+            dataset=dataset,
+            incremental=incremental,
+            params=params,
+            stealthy=stealthy,
+        )
+
+    def __enter__(self) -> "FetchContext":
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        self.close()
+
+
+# Backwards compatibility alias
+Context = MemoriousContext

@@ -28,7 +28,7 @@ from memorious.model.session import SessionModel
 from memorious.util import make_url_key
 
 if TYPE_CHECKING:
-    from memorious.logic.context import Context
+    from memorious.logic.context import BaseContext
 
 
 class ContextHttp:
@@ -36,7 +36,7 @@ class ContextHttp:
 
     STATE_SESSION = "_http"
 
-    def __init__(self, context: Context) -> None:
+    def __init__(self, context: BaseContext) -> None:
         self.context = context
 
         self.cache = settings.http_cache
@@ -72,7 +72,7 @@ class ContextHttp:
                 proxy=proxy,
             )
             self._client.headers["User-Agent"] = settings.user_agent
-            if self.context.crawler.stealthy:
+            if self.context.stealthy:
                 self._client.headers["User-Agent"] = UserAgent().random()
 
             # Apply saved session state (cookies, headers)
@@ -258,7 +258,11 @@ class ContextHttpResponse:
                 follow_redirects=self.follow_redirects,
             )
 
-            if existing is not None and response.status_code == 304:
+            if (
+                existing is not None
+                and response.status_code == 304
+                and self.context.archive.exists(existing["content_hash"])
+            ):
                 self.context.log.info(
                     "Using cached HTTP response", url=str(response.url)
                 )
