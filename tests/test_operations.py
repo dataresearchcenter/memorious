@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import ANY, MagicMock, patch
 
 import httpx
+from ftm_lakehouse import get_entities
 
 from memorious.operations.fetch import fetch, session
 from memorious.operations.initializers import dates, enumerate, seed, sequence
@@ -436,11 +437,11 @@ def test_lakehouse_default(context, mocker, httpbin_url):
     assert context.emit.call_count == 1
 
     # Verify entity was created with origin=crawl
-    dataset = get_lakehouse().get_dataset(context.crawler.name)
+    entities_repo = get_entities(context.crawler.name)
     entities = [
         e
-        for e in dataset.entities.query(origin="crawl")
-        if content_hash in e.get("contentHash", [])
+        for e in entities_repo.query(origin="crawl")
+        if content_hash in e.get("contentHash")
     ]
     assert len(entities) == 1
     assert entities[0].schema.name == "Document"
