@@ -77,7 +77,7 @@ def _extract_urls(
                     continue
                 seen.add(url)
 
-                tag = context.make_key(context.run_id, make_url_key(url))
+                tag = context.make_key(context.run_id, make_url_key(url), prefix="runs")
                 if context.check_tag(tag):
                     continue
                 context.set_tag(tag)

@@ -165,7 +165,7 @@ def fetch(context: Context, data: dict[str, Any]) -> None:
 
         data.update(result.serialize())
         if url != result.url:
-            tag = context.make_key(context.run_id, make_url_key(url))
+            tag = context.make_key(context.run_id, make_url_key(url), prefix="runs")
             context.set_tag(tag)
         context.emit(data=data)
     except httpx.HTTPError as ce:
