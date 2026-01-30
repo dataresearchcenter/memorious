@@ -18,6 +18,7 @@ from anystore.store.base import BaseStore
 from anystore.tags import Tags
 from anystore.util import ensure_uuid
 from anystore.util import join_relpaths as make_key
+from followthemoney import EntityProxy, model
 from ftm_lakehouse import get_archive, get_entities
 from ftm_lakehouse.repository import ArchiveRepository, EntityRepository
 from servicelayer.rate_limit import RateLimit
@@ -410,6 +411,12 @@ class MemoriousContext(BaseContext):
         if stage_obj is None:
             raise RuntimeError("[%r] has no stage: %s" % (crawler, stage))
         return cls(crawler, stage_obj, state)
+
+    def make_entity(self, schema: str) -> EntityProxy:
+        """Instantiate a FollowTheMoney entity"""
+        return model.make_entity(
+            schema, key_prefix=self.crawler.config.prefix or self.dataset
+        )
 
     def __repr__(self) -> str:
         return "<Context(%r, %r)>" % (self.crawler, self.stage)
