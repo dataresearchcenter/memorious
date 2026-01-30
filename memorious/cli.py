@@ -66,6 +66,17 @@ def run_crawler(
             help="Keep worker running after jobs complete (until interrupted)",
         ),
     ] = False,
+    idle_timeout: Annotated[
+        int,
+        typer.Option(
+            "--idle-timeout",
+            "-t",
+            help=(
+                "Auto-stop after N seconds of inactivity "
+                "(default: 30 for concurrency>1, 0 to disable)"
+            ),
+        ),
+    ] = 30,
     clear_runs: Annotated[
         bool,
         typer.Option(
@@ -78,18 +89,24 @@ def run_crawler(
     crawler = get_crawler(uri)
     if flush:
         crawler.flush()
+
+    # Convert 0 to None to let Crawler.run() apply defaults
+    effective_idle_timeout = idle_timeout if idle_timeout > 0 else None
+
     crawler.log.info(
         f"[{crawler.name}] Starting Memorious crawler ...",
         continue_on_error=continue_on_error,
         flush=flush,
         concurrency=concurrency,
         wait=wait,
+        idle_timeout=effective_idle_timeout,
         clear_runs=clear_runs,
     )
     crawler.run(
         continue_on_error=continue_on_error,
         concurrency=concurrency,
         wait=wait,
+        idle_timeout=effective_idle_timeout,
         clear_runs=clear_runs,
     )
     crawler.log.info(f"[{crawler.name}] Crawler completed.")

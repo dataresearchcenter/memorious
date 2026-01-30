@@ -1,5 +1,6 @@
 """Crawler orchestration and runtime management."""
 
+import asyncio
 import os
 import signal
 import threading
@@ -227,6 +228,7 @@ class Crawler:
         concurrency: int = 1,
         wait: bool | None = None,
         clear_runs: bool = True,
+        idle_timeout: int | None = None,
     ):
         """
         Run the crawler.
@@ -243,6 +245,8 @@ class Crawler:
                 process all queued jobs and return. Default: False for concurrency=1,
                 True for concurrency>1 (required for async execution).
             clear_runs: Cancel previous runs before starting (default: True).
+            idle_timeout: Seconds of queue inactivity before auto-stopping workers.
+                Auto-enabled (30s) when concurrency>1. Set to 0 to disable.
 
         Note:
             If max_runtime is set, a timer will send SIGTERM to stop the worker
@@ -254,6 +258,13 @@ class Crawler:
         # Concurrency > 1 requires wait=True for async execution
         if not wait:
             wait = concurrency > 1
+
+        # Auto-enable idle_timeout for concurrent crawlers
+        if idle_timeout is None and concurrency > 1:
+            idle_timeout = 30
+
+        # Generate run_id if not provided (needed for aggregate context)
+        run_id = run_id or ensure_uuid()
 
         # Defer the initial stage
         self.start(
@@ -279,19 +290,86 @@ class Crawler:
             timer.start()
 
         try:
-            # Run worker
-            app.run_worker(
-                wait=wait,
-                concurrency=concurrency,
-                delete_jobs=DeleteJobCondition.SUCCESSFUL,
-            )
+            # Run worker with idle monitoring if enabled (only applies when wait=True)
+            if wait and idle_timeout and idle_timeout > 0:
+                self._run_with_idle_monitor(
+                    app=app,
+                    concurrency=concurrency,
+                    idle_timeout=idle_timeout,
+                )
+            else:
+                # Run worker without idle monitoring
+                # (wait=False already exits after processing all jobs)
+                app.run_worker(
+                    wait=wait,
+                    concurrency=concurrency,
+                    delete_jobs=DeleteJobCondition.SUCCESSFUL,
+                )
         finally:
             # Cancel timeout timer if still running
             if timer is not None:
                 timer.cancel()
 
-            # Flush entity journal after run completes
-            self.entities_flush()
+            # Run aggregator (if configured) and flush entity journal
+            self.aggregate(self._make_aggregate_context(run_id))
+
+    def _run_with_idle_monitor(
+        self,
+        app,
+        concurrency: int,
+        idle_timeout: int,
+    ):
+        """Run worker with idle monitor for auto-stopping.
+
+        Args:
+            app: Procrastinate App instance.
+            concurrency: Number of concurrent jobs.
+            idle_timeout: Seconds of inactivity before stopping.
+        """
+        from memorious.logic.idle_monitor import IdleMonitor
+
+        async def _run_async():
+            async with app.open_async():
+                # Create worker
+                worker = app._worker(
+                    wait=True,
+                    concurrency=concurrency,
+                    delete_jobs=DeleteJobCondition.SUCCESSFUL,
+                )
+
+                # Create idle monitor
+                monitor = IdleMonitor(
+                    app=app,
+                    worker=worker,
+                    queue="memorious",
+                    idle_timeout=idle_timeout,
+                )
+
+                # Run both concurrently
+                await asyncio.gather(
+                    worker.run(),
+                    monitor.run(),
+                    return_exceptions=True,
+                )
+
+        asyncio.run(_run_async())
+
+    def _make_aggregate_context(self, run_id: str | None):
+        """Create a minimal context for running the aggregator.
+
+        Args:
+            run_id: Run identifier for the context.
+
+        Returns:
+            A BaseContext suitable for aggregator operations.
+        """
+        from memorious.logic.context import BaseContext
+
+        return BaseContext(
+            dataset=self.name,
+            run_id=run_id,
+            stealthy=self.stealthy,
+        )
 
     def defer(
         self,
