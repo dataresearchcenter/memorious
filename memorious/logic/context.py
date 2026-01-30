@@ -311,13 +311,13 @@ class MemoriousContext(BaseContext):
             return
 
         # Incremental: skip if already processed (cache key exists)
+        cache_key = self._make_emit_cache_key(data)
         if self.incremental:
-            cache_key = self._make_emit_cache_key(data)
             if cache_key and self.check_tag(cache_key):
                 self.log.info("Skipping emit (incremental)", cache_key=cache_key)
                 return
-            # Store cache key in data for marking complete at store stage
-            data["_emit_cache_key"] = cache_key
+        # Store cache key in data for marking complete at store stage
+        data["_emit_cache_key"] = cache_key
 
         # Debug sampling
         if self.settings.debug:
