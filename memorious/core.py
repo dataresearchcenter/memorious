@@ -31,7 +31,7 @@ def init_memorious() -> None:
     if settings.debug:
         configure_logging(level=logging.DEBUG)
     else:
-        configure_logging(level=logging.INFO)
+        configure_logging(level=settings.log_level)
     try:
         os.makedirs(settings.base_path)
     except Exception:

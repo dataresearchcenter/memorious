@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from io import BufferedReader, BytesIO
 from pathlib import Path
 from tempfile import mkdtemp
-from typing import IO, TYPE_CHECKING, Any, BinaryIO, ContextManager, cast, overload
+from typing import IO, TYPE_CHECKING, Any, BinaryIO, ContextManager, overload
 
 from anystore.interface.rate_limit import RateLimit
 from anystore.interface.tags import Tags
@@ -24,7 +24,8 @@ from ftm_lakehouse import get_archive, get_entities
 from ftm_lakehouse.repository import ArchiveRepository, EntityRepository
 from structlog.stdlib import BoundLogger
 
-from memorious.core import get_cache, get_tags, settings
+from memorious.core import get_cache, get_tags
+from memorious.env import Env
 from memorious.logic.check import ContextCheck
 from memorious.settings import Settings
 from memorious.util import make_url_key
@@ -93,7 +94,8 @@ class BaseContext:
             run_id=self.run_id,
         )
 
-        self.settings = cast(Settings, settings)
+        self.settings = Settings()
+        self.env = Env()
         self.archive = get_archive(dataset)
         self.tags = get_tags(dataset)
         self.cache = get_cache()
