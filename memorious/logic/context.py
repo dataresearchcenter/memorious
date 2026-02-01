@@ -276,9 +276,6 @@ class MemoriousContext(BaseContext):
         foreign_id = data.get("foreign_id")
         if foreign_id:
             return self.make_key(foreign_id, prefix="emit")
-        content_hash = data.get("content_hash")
-        if content_hash:
-            return self.make_key(content_hash, prefix="emit")
         url = data.get("url")
         if url:
             return self.make_key(make_url_key(url), prefix="emit")
