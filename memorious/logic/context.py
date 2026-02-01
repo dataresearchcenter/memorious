@@ -12,16 +12,16 @@ from pathlib import Path
 from tempfile import mkdtemp
 from typing import IO, TYPE_CHECKING, Any, BinaryIO, ContextManager, cast, overload
 
+from anystore.interface.rate_limit import RateLimit
+from anystore.interface.tags import Tags
 from anystore.logging import get_logger
-from anystore.serialize import to_store
-from anystore.store.base import BaseStore
-from anystore.tags import Tags
+from anystore.logic.serialize import to_store
+from anystore.store import Store
 from anystore.util import ensure_uuid
 from anystore.util import join_relpaths as make_key
 from followthemoney import EntityProxy, model
 from ftm_lakehouse import get_archive, get_entities
 from ftm_lakehouse.repository import ArchiveRepository, EntityRepository
-from servicelayer.rate_limit import RateLimit
 from structlog.stdlib import BoundLogger
 
 from memorious.core import get_cache, get_tags, settings
@@ -56,7 +56,7 @@ class BaseContext:
     settings: Settings
     tags: Tags
     archive: ArchiveRepository
-    cache: BaseStore
+    cache: Store
     _stealthy: bool
 
     def __init__(

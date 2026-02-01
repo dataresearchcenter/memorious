@@ -35,7 +35,7 @@ def make_url_key(
     """
     parts = urlsplit(url)
     method = method or "GET"
-    key_parts = [method.upper(), parts.netloc, parts.path]
+    key_parts = [method.upper(), parts.netloc, parts.path.strip("/")]
     if parts.query:
         key_parts.append(hash_data(parts.query))
     if content:

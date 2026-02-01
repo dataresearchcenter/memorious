@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlparse
 
 from anystore.util import join_relpaths, make_checksum
-from ftm_lakehouse.core.conventions import constants, path
+from ftm_lakehouse.core.conventions import tag
 from ftm_lakehouse.util import make_entity
 from normality import safe_filename
 from rigour.mime import normalize_mimetype
@@ -358,8 +358,8 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         # same as the memorious intermediary archive (which is the default), the
         # file already exists and only the metadata is stored.
         file = context.archive.store(
-            path.archive_blob(content_hash),
-            context.archive._blobs._store,
+            context.archive.to_uri(content_hash),
+            checksum=content_hash,
             name=file_name,
             key=file_key,
             mimetype=mimetype,
@@ -369,14 +369,12 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         # Generate entities
         make_entities = context.params.get("make_entities", True)
         if make_entities:
-            context.entities.add_many(
-                file.make_entities(), origin=constants.CRAWL_ORIGIN
-            )
+            context.entities.add_many(file.make_entities(), origin=tag.CRAWL_ORIGIN)
             # check for entities in payload
             entities = data.get("entities", [])
             entities = [make_entity(e, context.crawler.name) for e in entities]
             if entities:
-                context.entities.add_many(entities, origin=constants.CRAWL_ORIGIN)
+                context.entities.add_many(entities, origin=tag.CRAWL_ORIGIN)
 
         context.log.info(
             "Store [lakehouse]", file=file_name, key=file_key, checksum=file.checksum

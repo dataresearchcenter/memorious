@@ -7,7 +7,7 @@ from anystore.logging import get_logger
 from procrastinate.jobs import DeleteJobCondition
 from rich.console import Console
 
-from memorious.core import get_settings, init_memorious, settings
+from memorious.core import init_memorious, settings
 from memorious.logic.crawler import get_crawler
 from memorious.settings import VERSION
 from memorious.tasks import app as procrastinate_app
@@ -23,16 +23,16 @@ def main(
     version: Annotated[
         Optional[bool], typer.Option("--version", "-v", help="Show version")
     ] = False,
-    settings: Annotated[
-        Optional[bool], typer.Option(help="Show current settings")
+    settings_: Annotated[
+        Optional[bool], typer.Option("--settings", help="Show current settings")
     ] = False,
 ):
     """Crawler framework for documents and structured scrapers."""
     if version:
         console.print(f"memorious {VERSION}")
         raise typer.Exit()
-    if settings:
-        console.print(get_settings())
+    if settings_:
+        console.print(settings)
 
     init_memorious()
 
