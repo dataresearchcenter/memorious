@@ -1,4 +1,3 @@
-import logging
 import os
 
 from anystore.functools import weakref_cache as cache
@@ -28,10 +27,7 @@ def get_cache():
 
 def init_memorious() -> None:
     """Initialize memorious with logging and plugins."""
-    if settings.debug:
-        configure_logging(level=logging.DEBUG)
-    else:
-        configure_logging(level=settings.log_level)
+    configure_logging()
     try:
         os.makedirs(settings.base_path)
     except Exception:
