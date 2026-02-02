@@ -471,6 +471,17 @@ class ContextHttpResponse:
             return False
         return self.status_code < 400
 
+    def raise_for_status(self) -> None:
+        """Raise an httpx.HTTPStatusError if the response status indicates an error."""
+        if self.response is not None:
+            self.response.raise_for_status()
+        elif not self.ok:
+            raise httpx.HTTPStatusError(
+                f"HTTP {self.status_code}",
+                request=self.request or httpx.Request("GET", self.url or ""),
+                response=httpx.Response(self.status_code or 0),
+            )
+
     @cached_property
     def raw(self) -> bytes | None:
         """Get raw response content from archive."""
