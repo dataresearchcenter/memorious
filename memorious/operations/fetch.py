@@ -221,6 +221,7 @@ def session(context: Context, data: dict[str, Any]) -> None:
               user: "${HTTP_USER}"
               password: "${HTTP_PASSWORD}"
               user_agent: "MyBot/1.0"
+              cookies: foo=bar
             handle:
               pass: fetch
         ```
@@ -240,6 +241,18 @@ def session(context: Context, data: dict[str, Any]) -> None:
     referer = context.get("url")
     if referer is not None:
         context.http.client.headers["Referer"] = referer
+
+    cookies = context.get("cookies")
+    if cookies is not None:
+        if isinstance(cookies, str):
+            for pair in cookies.split(";"):
+                pair = pair.strip()
+                if "=" in pair:
+                    key, value = pair.split("=", 1)
+                    context.http.client.cookies.set(key.strip(), value.strip())
+        elif isinstance(cookies, dict):
+            for key, value in cookies.items():
+                context.http.client.cookies.set(key, value)
 
     proxy = context.get("proxy")
     if proxy is not None:
