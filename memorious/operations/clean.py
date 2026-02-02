@@ -13,6 +13,7 @@ from lxml import html
 
 from memorious.exc import MetaDataError
 from memorious.helpers.casting import cast_dict
+from memorious.helpers.template import render_template
 from memorious.operations import register
 
 if TYPE_CHECKING:
@@ -126,12 +127,7 @@ def clean(context: Context, data: dict[str, Any]) -> None:
         if is_mapping(values) and data.get(key) in values:
             data[key] = values[data[key]]
         elif isinstance(values, str):
-            try:
-                data[key] = values.format(**data)
-            except KeyError as e:
-                context.log.warning(
-                    "Missing key for format string", key=key, error=str(e)
-                )
+            data[key] = render_template(values, data)
 
     # Validate required
     for key in ensure_list(context.params.get("required")):
