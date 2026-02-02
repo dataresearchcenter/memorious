@@ -9,6 +9,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from anystore.io import smart_stream
+from anystore.util import ensure_uri
 from banal import ensure_dict, ensure_list
 from dateutil.relativedelta import relativedelta
 
@@ -60,6 +62,7 @@ def seed(context: Context, data: dict[str, Any]) -> None:
     Params:
         url (optional): Single URL or list of URLs.
         urls (optional): List of URLs (alternative to `url`).
+        from_list (optional): Uri to a list of urls in a file (1 per line)
 
     Example:
         ```yaml
@@ -86,6 +89,10 @@ def seed(context: Context, data: dict[str, Any]) -> None:
         for url in ensure_list(context.params.get(key)):
             url = url % data
             context.emit(data={**data, "url": url})
+    if context.params.get("from_list"):
+        uri = ensure_uri(context.params.get("from_list"))
+        for line in smart_stream(uri, mode="r"):
+            context.emit(data={**data, "url": line.strip()})
 
 
 @register("enumerate")
