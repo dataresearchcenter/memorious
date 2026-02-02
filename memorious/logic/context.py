@@ -220,7 +220,7 @@ class BaseContext:
 
     def close(self) -> None:
         """Clean up resources."""
-        self.http.save()
+        self.http.close()
         shutil.rmtree(self.work_path, ignore_errors=True)
 
 
@@ -268,7 +268,8 @@ class MemoriousContext(BaseContext):
     def _make_emit_cache_key(self, data: dict[str, Any]) -> str | None:
         """Generate a cache key for incremental emit tracking.
 
-        Uses content_hash if available, otherwise url, otherwise None.
+        Uses custom `emit_cache_key` or `foreign_id` if available, otherwise
+        url, otherwise None.
         """
         cache_key = data.get("emit_cache_key")
         if cache_key:

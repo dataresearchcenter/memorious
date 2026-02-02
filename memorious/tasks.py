@@ -83,6 +83,8 @@ def execute_stage(job: DatasetJob) -> None:
         # if not payload.get("continue_on_error", False):
         #     crawler.stop()
         #     raise
+    finally:
+        context.close()
 
 
 def defer_stage(

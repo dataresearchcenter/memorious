@@ -82,13 +82,19 @@ def get_context():
 @pytest.fixture(scope="function")
 def context():
     """Fresh context for each test function to avoid state leakage."""
-    return get_context()
+    ctx = get_context()
+    yield ctx
+    ctx.close()
 
 
 @pytest.fixture(scope="function")
 def http():
     """Fresh HTTP client for each test function."""
-    return ContextHttp(get_context())
+    ctx = get_context()
+    http = ContextHttp(ctx)
+    yield http
+    http.close()
+    ctx.close()
 
 
 @pytest.fixture(scope="session")

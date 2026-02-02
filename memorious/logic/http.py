@@ -158,9 +158,18 @@ class ContextHttp:
 
     def save(self) -> None:
         """Save session to cache using pydantic model."""
+        if self._client is None:
+            return
         key = self._get_session_key()
-        session_state = SessionModel.from_client(self.client)
+        session_state = SessionModel.from_client(self._client)
         self.context.cache.put(key, session_state, model=SessionModel)
+
+    def close(self) -> None:
+        """Save session state and close the httpx client."""
+        self.save()
+        if self._client is not None:
+            self._client.close()
+            self._client = None
 
 
 class ContextHttpResponse:
