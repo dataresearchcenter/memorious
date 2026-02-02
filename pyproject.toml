@@ -28,14 +28,14 @@ dependencies = [
     "stringcase (>=1.2.0,<2.0.0)",
     "legacy-cgi (>=2.6.3,<3.0.0)",
     "rigour (>=1.6.2,<2.0.0)",
-    "ftmq @ git+https://github.com/dataresearchcenter/ftmq.git",
-    "anystore @ git+https://github.com/dataresearchcenter/anystore.git@chore/refactor",
-    "openaleph-procrastinate @ git+https://github.com/openaleph/openaleph-procrastinate.git",
+    "ftmq (>=4.5.2,<5.0.0)",
+    "anystore (>=1.0.0,<2.0.0)",
+    "openaleph-procrastinate (>=5.2.0,<6.0.0)",
     "httpx (>=0.28.1,<0.29.0)",
     "jq (>=1.6.0,<2.0.0)",
     "furl (>=2.1.0,<3.0.0)",
     "jinja2 (>=3.0.0,<4.0.0)",
-    "ftm-lakehouse @ git+https://github.com/openaleph/ftm-lakehouse.git",
+    "ftm-lakehouse (>=0.2.0,<0.3.0)",
 ]
 
 [project.optional-dependencies]
