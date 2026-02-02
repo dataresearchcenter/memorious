@@ -85,7 +85,7 @@ def seed(context: Context, data: dict[str, Any]) -> None:
     for key in ("url", "urls"):
         for url in ensure_list(context.params.get(key)):
             url = url % data
-            context.emit(data={"url": url})
+            context.emit(data={**data, "url": url})
 
 
 @register("enumerate")
