@@ -4,7 +4,6 @@ from typing import Annotated, Optional
 
 import typer
 from anystore.logging import get_logger
-from procrastinate.jobs import DeleteJobCondition
 from rich.console import Console
 
 from memorious.core import init_memorious, settings
@@ -124,6 +123,8 @@ def worker(
     ] = 1,
 ):
     """Start the procrastinate worker to process crawler jobs."""
+    from procrastinate.jobs import DeleteJobCondition
+
     console.print(f"Starting memorious worker with concurrency={concurrency}")
     procrastinate_app.run_worker(
         wait=True,
