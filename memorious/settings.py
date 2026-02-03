@@ -69,6 +69,7 @@ class Settings(BaseSettings):
         default="Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.1) "
         f"memorious/{VERSION}"
     )
+    randomize_priority: bool = False
 
     cache_uri: str | None = Field(default="memory://")
     """Cache uri for runtime cache (defaults to in-memory)"""

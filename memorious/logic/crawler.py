@@ -5,6 +5,7 @@ import os
 import signal
 import threading
 from datetime import datetime
+from random import randint
 
 from anystore.functools import weakref_cache as cache
 from anystore.logging import get_logger
@@ -400,6 +401,7 @@ class Crawler:
             data=data,
             incremental=incr,
             continue_on_error=coe,
+            priority=randint(0, 100) if settings.randomize_priority else 50,
         )
 
     def get(self, name: str) -> CrawlerStage | None:
