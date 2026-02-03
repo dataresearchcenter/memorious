@@ -313,10 +313,8 @@ class MemoriousContext(BaseContext):
 
         # Incremental: skip if already processed (cache key exists)
         cache_key = self._make_emit_cache_key(data)
-        if self.incremental:
-            if cache_key and self.check_tag(cache_key):
-                self.log.info("Skipping emit (incremental)", cache_key=cache_key)
-                return
+        if self.should_skip_incremental(cache_key):
+            return
         # Store cache key in data for marking complete at store stage
         data["_emit_cache_key"] = cache_key
 
@@ -358,6 +356,14 @@ class MemoriousContext(BaseContext):
             self.set_tag(cache_key, datetime.now())
             self.log.debug("Marked emit complete", cache_key=cache_key)
 
+    def should_skip_incremental(self, cache_key: str | None) -> bool:
+        """Test if an emit_cache_key already exists"""
+        if self.incremental:
+            if cache_key and self.check_tag(cache_key):
+                self.log.info("Skipping (incremental)", cache_key=cache_key)
+                return True
+        return False
+
     def recurse(
         self, data: dict[str, Any] | None = None, delay: int | None = None
     ) -> None:
@@ -369,6 +375,10 @@ class MemoriousContext(BaseContext):
     def execute(self, data: dict[str, Any]) -> Any:
         """Execute the stage method with the given data."""
         try:
+            # maybe someone else was faster:
+            cache_key = self._make_emit_cache_key(data)
+            if self.should_skip_incremental(cache_key):
+                return
             self.log.info(
                 "Executing stage",
                 method=self.stage.method_name,
