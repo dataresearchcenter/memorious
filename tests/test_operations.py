@@ -213,7 +213,9 @@ def test_seed(context, mocker, httpbin_url):
     mocker.patch.object(context, "emit")
     seed(context, data={"status": 404})
     assert context.emit.call_count == 1
-    context.emit.assert_called_once_with(data={"url": f"{httpbin_url}/status/404"})
+    context.emit.assert_called_once_with(
+        data={"status": 404, "url": f"{httpbin_url}/status/404"}
+    )
 
 
 def test_sequence(context, mocker):
