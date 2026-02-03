@@ -1,8 +1,12 @@
 import logging
+import warnings
 
-import urllib3
+# Suppress pydantic_settings warning about missing /run/secrets directory
+warnings.filterwarnings("ignore", message='directory "/run/secrets" does not exist')
 
-from memorious.logic.fetch import FetchClient, create_fetch_client, fetch
+import urllib3  # noqa: E402
+
+from memorious.logic.fetch import FetchClient, create_fetch_client, fetch  # noqa: E402
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 

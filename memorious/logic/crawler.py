@@ -129,6 +129,35 @@ class Crawler:
         """
         return _get_run_started(self.name, run_id)
 
+    def get_recent_runs(self, limit: int = 5) -> list[tuple[str, datetime]]:
+        """Get recent runs sorted by start time (newest first).
+
+        Args:
+            limit: Maximum number of runs to return.
+
+        Returns:
+            List of (run_id, started_datetime) tuples.
+        """
+        tags = get_tags(self.name)
+        runs = []
+        for key in tags.iterate_keys(glob="runs/*/started"):
+            # key = "runs/{run_id}/started"
+            run_id = key.split("/")[1]
+            started = tags.get(key)
+            if started:
+                runs.append((run_id, started))
+        runs.sort(key=lambda x: x[1], reverse=True)
+        return runs[:limit]
+
+    def count_emits(self) -> int:
+        """Count emit cache keys (stored documents).
+
+        Returns:
+            Number of emit keys in tags.
+        """
+        tags = get_tags(self.name)
+        return sum(1 for _ in tags.iterate_keys(prefix=f"{self.name}/emit"))
+
     def is_run_expired(self, run_id: str) -> bool:
         """Check if a run has exceeded its max_runtime.
 

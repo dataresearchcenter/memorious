@@ -1,15 +1,16 @@
 """Memorious CLI - command line interface for crawler management."""
 
+from datetime import datetime, timedelta
 from typing import Annotated, Optional
 
 import typer
-from anystore.logging import get_logger
+from anystore.logging import configure_logging, get_logger
 from rich.console import Console
+from rich.table import Table
 
 from memorious.core import init_memorious, settings
 from memorious.logic.crawler import get_crawler
 from memorious.settings import VERSION
-from memorious.tasks import app as procrastinate_app
 
 log = get_logger(__name__)
 console = Console(stderr=True)
@@ -125,6 +126,8 @@ def worker(
     """Start the procrastinate worker to process crawler jobs."""
     from procrastinate.jobs import DeleteJobCondition
 
+    from memorious.tasks import app as procrastinate_app
+
     console.print(f"Starting memorious worker with concurrency={concurrency}")
     procrastinate_app.run_worker(
         wait=True,
@@ -151,6 +154,54 @@ def flush_crawler(
     crawler = get_crawler(uri)
     crawler.flush()
     console.print(f"Crawler [bold]{crawler.name}[/bold] data flushed")
+
+
+def format_age(delta: timedelta) -> str:
+    """Format a timedelta as a human-readable age string."""
+    secs = int(delta.total_seconds())
+    if secs < 3600:
+        return f"{secs // 60}m ago"
+    if secs < 86400:
+        return f"{secs // 3600}h ago"
+    return f"{secs // 86400}d ago"
+
+
+@cli.command("status")
+def status(
+    uri: Annotated[str, typer.Argument(help="URI or path to crawler YAML config file")],
+    runs: Annotated[
+        int, typer.Option("--runs", "-r", help="Number of recent runs to show")
+    ] = 5,
+):
+    """Show crawler status: recent runs and stored document count."""
+    configure_logging(level="ERROR")
+    crawler = get_crawler(uri)
+
+    console.print(f"\n[bold]{crawler.name}[/bold]")
+    if crawler.description and crawler.description != crawler.name:
+        console.print(f"[dim]{crawler.description}[/dim]\n")
+    else:
+        console.print()
+
+    # Recent runs table
+    recent = crawler.get_recent_runs(limit=runs)
+    if recent:
+        table = Table(title="Recent Runs")
+        table.add_column("Run ID")
+        table.add_column("Started")
+        table.add_column("Age")
+
+        now = datetime.now()
+        for run_id, started in recent:
+            age = format_age(now - started)
+            table.add_row(run_id[:12], started.strftime("%Y-%m-%d %H:%M"), age)
+        console.print(table)
+    else:
+        console.print("[yellow]No runs recorded[/yellow]")
+
+    # Emit count
+    emit_count = crawler.count_emits()
+    console.print(f"\n[bold]Stored documents:[/bold] {emit_count:,}\n")
 
 
 if __name__ == "__main__":
