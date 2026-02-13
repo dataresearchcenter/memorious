@@ -8,12 +8,13 @@ import json
 import random
 from datetime import datetime, timedelta, timezone
 from functools import cached_property
-from hashlib import sha1
+from hashlib import sha256
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ContextManager
 from urllib.parse import unquote, urlparse
 
 import httpx
+from anystore.logic.constants import CHUNK_SIZE, CHUNK_SIZE_LARGE
 from banal import is_mapping
 from lxml import etree, html
 from normality import guess_file_encoding, stringify
@@ -321,7 +322,7 @@ class ContextHttpResponse:
 
         # Use temp file for streaming (allows resume on failure)
         work_path = Path(self.context.work_path)
-        request_hash = sha1((self.request_id or "").encode()).hexdigest()[:16]
+        request_hash = sha256((self.request_id or "").encode()).hexdigest()[:16]
         temp_path = work_path / f"partial_{request_hash}"
 
         # Determine starting position and temp file path
@@ -330,19 +331,19 @@ class ContextHttpResponse:
             start_byte = self.partial_path.stat().st_size
             temp_path = self.partial_path
 
-        content_hash = sha1()
+        content_hash = sha256()
 
         # If resuming, hash existing content first
         if start_byte > 0 and temp_path.exists():
             with open(temp_path, "rb") as f:
-                while chunk := f.read(8192):
+                while chunk := f.read(CHUNK_SIZE_LARGE):
                     content_hash.update(chunk)
 
         try:
             # Stream to temp file (append if resuming, write if fresh)
             mode = "ab" if start_byte > 0 else "wb"
             with open(temp_path, mode) as f:
-                for chunk in self.response.iter_bytes(chunk_size=8192):
+                for chunk in self.response.iter_bytes(chunk_size=CHUNK_SIZE):
                     content_hash.update(chunk)
                     f.write(chunk)
 

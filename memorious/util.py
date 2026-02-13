@@ -1,5 +1,5 @@
 import os
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
 from anystore.util import join_relpaths
@@ -33,6 +33,7 @@ def make_url_key(
     Returns:
         A path-like key: method/netloc/path/[hash(query)]/[hash(content)]/hash(url)
     """
+    url = unquote(url)
     parts = urlsplit(url)
     method = method or "GET"
     key_parts = [method.upper(), parts.netloc, parts.path.strip("/")]
