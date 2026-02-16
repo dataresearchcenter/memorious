@@ -420,8 +420,6 @@ def test_directory_same_content(context, mocker, httpbin_url):
 
 def test_lakehouse_default(context, mocker, httpbin_url):
     """Test lakehouse store with default archive."""
-    from ftm_lakehouse import get_lakehouse
-
     url = f"{httpbin_url}/user-agent"
     result = context.http.get(url, headers={"User-Agent": "Memorious Test"})
     data = result.serialize()
@@ -440,6 +438,7 @@ def test_lakehouse_default(context, mocker, httpbin_url):
 
     # Verify entity was created with origin=crawl
     entities_repo = get_entities(context.crawler.name)
+    entities_repo.flush()
     entities = [
         e
         for e in entities_repo.query(origin="crawl")

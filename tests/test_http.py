@@ -134,7 +134,7 @@ class TestContextHttpResponse:
         content_hash = context_http_response.fetch()
         # fetch() now returns content_hash, not file_path
         assert isinstance(content_hash, str)
-        assert len(content_hash) == 40  # SHA1 hex digest length
+        assert len(content_hash) == 64  # SHA256 hex digest length
 
     def test_contenttype(self, http, httpbin_url):
         request = httpx.Request("GET", f"{httpbin_url}/get")
@@ -376,7 +376,7 @@ class TestResumableDownloads:
             # the 200 response will reset partial state and download full content)
             content_hash = response.fetch()
             assert content_hash is not None
-            assert len(content_hash) == 40  # SHA1 hex digest length
+            assert len(content_hash) == 64  # SHA256 hex digest length
         finally:
             # Cleanup
             if partial_path.exists():

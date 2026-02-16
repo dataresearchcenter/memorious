@@ -113,7 +113,7 @@ def test_pipeline_auth(httpbin_auth_crawler, auth_output_dir):
     meta_files = [
         f
         for f in auth_output_dir.glob("**/*.json")
-        if re.match(r"^[a-f0-9]{40}$", f.stem)
+        if re.match(r"^[a-f0-9]{64}$", f.stem)
     ]
     assert len(meta_files) > 0, "Expected metadata JSON file (named by content_hash)"
 

@@ -228,8 +228,8 @@ class TestFetchFunction:
         """Test that fetch() stores content in archive."""
         response = fetch(f"{httpbin_url}/json", dataset="fetch-archive")
         assert response.content_hash is not None
-        # Content hash should be a SHA1 hex digest (40 chars)
-        assert len(response.content_hash) == 40
+        # Content hash should be a SHA256 hex digest (64 chars)
+        assert len(response.content_hash) == 64
 
 
 class TestFetchCaching:
