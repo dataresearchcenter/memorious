@@ -439,6 +439,14 @@ class ContextHttpResponse:
             raw = self.raw
             if raw:
                 self._encoding = guess_file_encoding(io.BytesIO(raw))
+                # Charset detectors misidentify short ASCII/UTF-8 text as
+                # cp1252 or latin-1; prefer utf-8 when the content is valid
+                if self._encoding and self._encoding.lower() != "utf-8":
+                    try:
+                        raw.decode("utf-8")
+                        self._encoding = "utf-8"
+                    except UnicodeDecodeError:
+                        pass
         return self._encoding
 
     @encoding.setter
