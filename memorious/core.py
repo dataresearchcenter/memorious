@@ -1,6 +1,6 @@
 import os
+from functools import cache
 
-from anystore.functools import weakref_cache as cache
 from anystore.interface.rate_limit import RateLimit
 from anystore.logging import configure_logging, get_logger
 from anystore.store import get_store

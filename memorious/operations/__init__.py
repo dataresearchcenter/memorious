@@ -7,12 +7,11 @@ and optionally emits data to subsequent stages.
 """
 
 import re
+from functools import cache
 from importlib import import_module
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
-
-from anystore.functools import weakref_cache as cache
 
 if TYPE_CHECKING:
     from memorious.logic.context import Context

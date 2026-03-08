@@ -5,9 +5,9 @@ import os
 import signal
 import threading
 from datetime import datetime
+from functools import cache
 from random import randint
 
-from anystore.functools import weakref_cache as cache
 from anystore.logging import get_logger
 from anystore.types import SDict, Uri
 from anystore.util import ensure_uri, ensure_uuid, path_from_uri
