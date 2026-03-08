@@ -1714,7 +1714,7 @@ api = ["fastapi (>=0.128.0,<0.129.0)", "granian (>=2.7.0,<3.0.0)", "pyjwt (>=2.1
 type = "git"
 url = "https://github.com/openaleph/ftm-lakehouse.git"
 reference = "HEAD"
-resolved_reference = "f6c6d1fcff7f62ee95234b6a01ea153492a9e231"
+resolved_reference = "5349086d63e33203bce0de174f8cf161b5b167fe"
 
 [[package]]
 name = "ftmq"
