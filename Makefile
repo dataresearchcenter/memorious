@@ -54,5 +54,5 @@ image:
 	docker build -t ghcr.io/dataresearchcenter/memorious .
 
 documentation:
-	mkdocs build
+	zensical build
 	aws --profile nbg1 --endpoint-url https://s3.investigativedata.org s3 sync ./site s3://docs.investigraph.dev/lib/memorious

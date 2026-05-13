@@ -34,4 +34,6 @@ This is a hard fork of the [original memorious project](https://github.com/aleph
 
 ## License
 
-[MIT License](https://github.com/dataresearchcenter/memorious/blob/master/LICENSE)
+[AGPL-3.0 license](https://github.com/dataresearchcenter/memorious/blob/main/LICENSE)
+
+Prior to version 4, the original `memorious` was released under MIT license.
