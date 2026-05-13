@@ -3,7 +3,7 @@
 ## From PyPI
 
 ```bash
-pip install "memorious @ git+https://github.com/dataresearchcenter/memorious.git"
+pip install memorious4
 ```
 
 ## From Source
@@ -20,16 +20,16 @@ Memorious has optional dependencies for specific features:
 
 ```bash
 # SQL database support (SQLite, PostgreSQL)
-pip install memorious[sql]
+pip install memorious4[sql]
 
 # PostgreSQL with psycopg2
-pip install memorious[postgres]
+pip install memorious4[postgres]
 
 # Redis support
-pip install memorious[redis]
+pip install memorious4[redis]
 
 # FTP support
-pip install memorious[ftp]
+pip install memorious4[ftp]
 ```
 
 ## Verify Installation
