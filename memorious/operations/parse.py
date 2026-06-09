@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import csv
 from typing import TYPE_CHECKING, Any
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urljoin, urlsplit
 
 import jq
 from anystore.logging import get_logger
@@ -35,6 +35,11 @@ URL_TAGS = [
     (".//link", "href"),
     (".//iframe", "src"),
 ]
+
+# URL schemes the crawler can actually fetch over HTTP. Other schemes
+# (data:, mailto:, javascript:, tel:, ...) routinely appear in href/src
+# attributes but must never be emitted as fetch targets.
+FETCHABLE_SCHEMES = {"http", "https"}
 
 
 def _extract_urls(
@@ -76,6 +81,10 @@ def _extract_urls(
                 if url is None or url in seen:
                     continue
                 seen.add(url)
+
+                # Skip non-fetchable schemes (data:, mailto:, javascript:, ...)
+                if urlsplit(url).scheme not in FETCHABLE_SCHEMES:
+                    continue
 
                 tag = context.make_key(context.run_id, make_url_key(url), prefix="runs")
                 if context.check_tag(tag):
