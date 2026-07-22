@@ -16,7 +16,7 @@ from urllib.parse import unquote, urlparse
 
 from anystore.util import join_relpaths, make_checksum
 from ftm_lakehouse.core.conventions import tag
-from ftm_lakehouse.util import make_entity
+from ftmq.util import make_entity
 from normality import safe_filename
 from rigour.mime import normalize_mimetype
 
