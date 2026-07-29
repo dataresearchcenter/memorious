@@ -472,7 +472,7 @@ def test_lakehouse_make_entities_disabled(context, mocker, httpbin_url):
     dataset = get_lakehouse().get_dataset(context.crawler.name)
     entities = [
         e
-        for e in dataset.entities.query(origin="crawl")
+        for e in dataset.get_entities().query(origin="crawl")
         if content_hash in e.get("contentHash")
     ]
     assert len(entities) == 0
