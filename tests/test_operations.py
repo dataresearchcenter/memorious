@@ -450,7 +450,7 @@ def test_lakehouse_default(context, mocker, httpbin_url):
 
 def test_lakehouse_make_entities_disabled(context, mocker, httpbin_url):
     """Test lakehouse store with entity generation disabled."""
-    from ftm_lakehouse import get_lakehouse
+    from ftm_lakehouse import get_entities
 
     url = f"{httpbin_url}/html"
     result = context.http.get(url)
@@ -469,11 +469,9 @@ def test_lakehouse_make_entities_disabled(context, mocker, httpbin_url):
     assert context.emit.call_count == 1
 
     # Verify no entity was created for this file
-    dataset = get_lakehouse().get_dataset(context.crawler.name)
+    repo = get_entities(context.crawler.name)
     entities = [
-        e
-        for e in dataset.get_entities().query(origin="crawl")
-        if content_hash in e.get("contentHash")
+        e for e in repo.query(origin="crawl") if content_hash in e.get("contentHash")
     ]
     assert len(entities) == 0
 
