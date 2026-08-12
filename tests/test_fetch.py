@@ -261,6 +261,91 @@ class TestFetchSessionPersistence:
             assert json_data["cookies"].get("test_cookie") == "test_value"
 
 
+class TestFetchIncremental:
+    """Tests for incremental skipping via manual cache keys."""
+
+    def test_fetch_one_shot_skips_second_call(self, httpbin_url):
+        """Test one-shot fetch() skips when cache_key was processed."""
+        url = f"{httpbin_url}/get"
+        response = fetch(url, dataset="inc_oneshot", cache_key="k1")
+        assert response is not None
+        assert response.ok
+        response = fetch(url, dataset="inc_oneshot", cache_key="k1")
+        assert response is None
+
+    def test_fetch_client_get_skips_second_call(self, httpbin_url):
+        """Test FetchClient.get() skips a processed cache_key."""
+        url = f"{httpbin_url}/get"
+        with create_fetch_client(dataset="inc_client") as client:
+            response = client.get(url, cache_key="k1")
+            assert response is not None
+            assert response.ok
+            assert client.get(url, cache_key="k1") is None
+            # A different cache key still fetches
+            response = client.get(url, cache_key="k2")
+            assert response is not None
+            assert response.ok
+
+    def test_cache_key_without_incremental_never_skips(self, httpbin_url):
+        """Test incremental=False disables skipping."""
+        url = f"{httpbin_url}/get"
+        with create_fetch_client(dataset="inc_disabled", incremental=False) as client:
+            assert client.get(url, cache_key="k1") is not None
+            assert client.get(url, cache_key="k1") is not None
+
+    def test_no_cache_key_never_skips(self, httpbin_url):
+        """Test requests without cache_key are never skipped."""
+        url = f"{httpbin_url}/get"
+        with create_fetch_client(dataset="inc_nokey") as client:
+            assert client.get(url) is not None
+            assert client.get(url) is not None
+
+    def test_failed_request_not_marked(self, httpbin_url):
+        """Test failed requests are not marked and get retried."""
+        url = f"{httpbin_url}/status/404"
+        with create_fetch_client(dataset="inc_failed") as client:
+            response = client.get(url, cache_key="bad")
+            assert response is not None
+            assert not response.ok
+            assert client.context.check_incremental("bad") is False
+            # Not skipped on retry
+            assert client.get(url, cache_key="bad") is not None
+
+    def test_mark_complete_explicit(self, httpbin_url):
+        """Test explicit mark_complete() for deferred marking."""
+        url = f"{httpbin_url}/get"
+        with create_fetch_client(dataset="inc_deferred") as client:
+            client.mark_complete("k1")
+            assert client.get(url, cache_key="k1") is None
+
+    def test_cache_key_forces_eager(self, httpbin_url):
+        """Test cache_key overrides lazy to mark reliably."""
+        with create_fetch_client(dataset="inc_eager") as client:
+            response = client.get(f"{httpbin_url}/get", lazy=True, cache_key="k1")
+            assert response is not None
+            assert response._response is not None
+            assert client.context.check_incremental("k1") is True
+
+    def test_context_check_and_mark(self):
+        """Test check_incremental/mark_incremental on the context."""
+        with FetchContext(dataset="inc_context") as ctx:
+            assert ctx.check_incremental("foo") is False
+            ctx.mark_incremental("foo")
+            assert ctx.check_incremental("foo") is True
+
+    def test_context_check_respects_incremental_flag(self):
+        """Test check_incremental is False when incremental is off."""
+        with FetchContext(dataset="inc_context_off", incremental=False) as ctx:
+            ctx.mark_incremental("foo")
+            assert ctx.check_incremental("foo") is False
+
+    def test_context_skip_incremental_eager(self):
+        """Test skip_incremental keeps its eager check-then-mark behavior."""
+        with FetchContext(dataset="inc_context_skip") as ctx:
+            assert ctx.skip_incremental("foo") is False
+            assert ctx.skip_incremental("foo") is True
+
+
 class TestPackageLevelImports:
     """Tests for package-level imports."""
 

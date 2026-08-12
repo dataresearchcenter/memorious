@@ -211,6 +211,52 @@ The `skip_incremental()` method:
 - Returns `False` if it's new (process it)
 - Automatically marks the criteria as processed when returning `False`
 
+Note that `skip_incremental()` marks eagerly, before the operation actually
+runs. For a two-phase check/mark (mark only after processing succeeded), use
+`context.check_incremental(*criteria)` and `context.mark_incremental(*criteria)`
+directly.
+
+## Standalone Fetch API
+
+The standalone fetch API (`fetch()`, `FetchClient`) supports incremental
+skipping via a manually specified cache key:
+
+```python
+from memorious import fetch, create_fetch_client
+
+# Skipped (returns None) if "report-2024" was already fetched successfully
+response = fetch("https://example.com/report.pdf", cache_key="report-2024")
+if response is None:
+    print("Already fetched in a previous run")
+
+# Same for reusable clients
+with create_fetch_client(dataset="my-scraper") as client:
+    response = client.get("https://example.com/report.pdf", cache_key="report-2024")
+```
+
+Semantics:
+
+- The cache key is stored as `{dataset}/inc/{cache_key}` — the same tag
+  namespace `skip_incremental()` uses, scoped per dataset.
+- Skipping requires `incremental=True` (the default). With
+  `incremental=False`, requests are never skipped, but successful ones are
+  still marked — useful for backfill runs feeding later incremental runs.
+- The key is marked **after** a successful response (`response.ok`), so
+  failed requests and HTTP errors (4xx/5xx) are retried on the next run.
+- `cache_key` forces eager execution (`lazy` is ignored) so the outcome is
+  known before marking.
+
+To defer marking until your own processing succeeded, check and mark
+explicitly instead of passing `cache_key` to the request:
+
+```python
+with create_fetch_client(dataset="my-scraper") as client:
+    if not client.context.check_incremental("report-2024"):
+        response = client.get("https://example.com/report.pdf")
+        process(response)
+        client.mark_complete("report-2024")
+```
+
 ## Tags Storage
 
 By default, tags are stored alongside the archive. You can configure a separate storage location:

@@ -29,6 +29,19 @@ Example usage:
     # Context manager
     with create_fetch_client(dataset="scraper") as client:
         response = client.get("https://example.com")
+
+    # Incremental fetch with a manual cache key: the request is skipped
+    # (returns None) if the key was already processed successfully.
+    response = fetch("https://example.com/report.pdf", cache_key="report-2024")
+    if response is None:
+        ...  # already fetched in a previous run
+
+    # Defer marking until downstream processing succeeded
+    with create_fetch_client(dataset="scraper") as client:
+        if not client.context.check_incremental("report-2024"):
+            response = client.get("https://example.com/report.pdf")
+            process(response)
+            client.mark_complete("report-2024")
 """
 
 from __future__ import annotations
@@ -73,7 +86,8 @@ class FetchClient:
         auth: tuple[str, str] | None = None,
         timeout: int | None = None,
         lazy: bool = False,
-    ) -> ContextHttpResponse:
+        cache_key: str | None = None,
+    ) -> ContextHttpResponse | None:
         """Perform a GET request.
 
         Args:
@@ -83,17 +97,22 @@ class FetchClient:
             auth: Optional (username, password) tuple for basic auth.
             timeout: Optional request timeout in seconds.
             lazy: If True, don't execute request until response is accessed.
+                Ignored when `cache_key` is given.
+            cache_key: Optional incremental cache key, see `request`.
 
         Returns:
-            ContextHttpResponse with content stored in archive.
+            ContextHttpResponse with content stored in archive, or None if
+            the request was skipped incrementally.
         """
-        return self._context.http.get(
+        return self.request(
+            "GET",
             url,
             headers=headers,
             params=params,
             auth=auth,
             timeout=timeout,
             lazy=lazy,
+            cache_key=cache_key,
         )
 
     def post(
@@ -106,7 +125,8 @@ class FetchClient:
         auth: tuple[str, str] | None = None,
         timeout: int | None = None,
         lazy: bool = False,
-    ) -> ContextHttpResponse:
+        cache_key: str | None = None,
+    ) -> ContextHttpResponse | None:
         """Perform a POST request.
 
         Args:
@@ -118,11 +138,15 @@ class FetchClient:
             auth: Optional (username, password) tuple for basic auth.
             timeout: Optional request timeout in seconds.
             lazy: If True, don't execute request until response is accessed.
+                Ignored when `cache_key` is given.
+            cache_key: Optional incremental cache key, see `request`.
 
         Returns:
-            ContextHttpResponse with content stored in archive.
+            ContextHttpResponse with content stored in archive, or None if
+            the request was skipped incrementally.
         """
-        return self._context.http.post(
+        return self.request(
+            "POST",
             url,
             data=data,
             json_data=json_data,
@@ -131,6 +155,7 @@ class FetchClient:
             auth=auth,
             timeout=timeout,
             lazy=lazy,
+            cache_key=cache_key,
         )
 
     def request(
@@ -144,7 +169,8 @@ class FetchClient:
         auth: tuple[str, str] | None = None,
         timeout: int | None = None,
         lazy: bool = False,
-    ) -> ContextHttpResponse:
+        cache_key: str | None = None,
+    ) -> ContextHttpResponse | None:
         """Perform an HTTP request with the specified method.
 
         Args:
@@ -157,11 +183,24 @@ class FetchClient:
             auth: Optional (username, password) tuple for basic auth.
             timeout: Optional request timeout in seconds.
             lazy: If True, don't execute request until response is accessed.
+                Ignored when `cache_key` is given.
+            cache_key: Optional incremental cache key. If it has been marked
+                as processed in a previous run, the request is skipped and
+                None is returned. It is marked after a successful response.
 
         Returns:
-            ContextHttpResponse with content stored in archive.
+            ContextHttpResponse with content stored in archive, or None if
+            the request was skipped incrementally.
         """
-        return self._context.http.request(
+        if cache_key and self._context.check_incremental(cache_key):
+            self._context.log.info(
+                "Skipping fetch (incremental)", cache_key=cache_key, url=url
+            )
+            return None
+        if cache_key and lazy:
+            self._context.log.debug("cache_key forces eager fetch", cache_key=cache_key)
+            lazy = False
+        response = self._context.http.request(
             method,
             url,
             headers=headers,
@@ -172,6 +211,17 @@ class FetchClient:
             timeout=timeout,
             lazy=lazy,
         )
+        if cache_key and response.ok:
+            self._context.mark_incremental(cache_key)
+        return response
+
+    def mark_complete(self, cache_key: str) -> None:
+        """Mark an incremental cache key as processed.
+
+        Use this to defer marking until downstream processing succeeded,
+        instead of passing `cache_key` to the request methods.
+        """
+        self._context.mark_incremental(cache_key)
 
     def close(self) -> None:
         """Close the client and clean up resources."""
@@ -245,7 +295,8 @@ def fetch(
     user_agent: str | None = None,
     stealthy: bool = False,
     incremental: bool = True,
-) -> ContextHttpResponse:
+    cache_key: str | None = None,
+) -> ContextHttpResponse | None:
     """One-shot fetch with automatic resource cleanup.
 
     Fetches a URL and stores the content in the archive. The response
@@ -267,9 +318,13 @@ def fetch(
         user_agent: Custom User-Agent header.
         stealthy: Use random user agents (default: False).
         incremental: Enable incremental state tracking (default: True).
+        cache_key: Optional incremental cache key. If it has been marked
+            as processed in a previous run, the request is skipped and
+            None is returned. It is marked after a successful response.
 
     Returns:
-        ContextHttpResponse with content stored in archive.
+        ContextHttpResponse with content stored in archive, or None if
+        the request was skipped incrementally.
 
     Example:
         >>> response = fetch("https://example.com/data.json")
@@ -294,7 +349,10 @@ def fetch(
             params=params,
             auth=auth,
             timeout=timeout,
+            cache_key=cache_key,
         )
+        if response is None:
+            return None
         # Ensure content is fetched and archived before context closes
         response.fetch()
         return response

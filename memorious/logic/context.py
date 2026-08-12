@@ -161,6 +161,26 @@ class BaseContext:
             return False
         return self.tags.exists(self.make_key(key))
 
+    def check_incremental(self, *criteria: str) -> bool:
+        """Check if a set of criteria has already been processed.
+
+        Non-mutating: returns ``True`` if incremental mode is enabled and
+        the criteria have been marked via ``mark_incremental`` (or
+        ``skip_incremental``), ``False`` otherwise.
+        """
+        if not self.incremental:
+            return False
+        key = self.make_key(*criteria, prefix="inc")
+        if key is None:
+            return False
+        return self.check_tag(key)
+
+    def mark_incremental(self, *criteria: str) -> None:
+        """Mark a set of criteria as processed for incremental runs."""
+        key = self.make_key(*criteria, prefix="inc")
+        if key is not None:
+            self.set_tag(key)
+
     def skip_incremental(self, *criteria: str) -> bool:
         """Perform an incremental check on a set of criteria.
 
@@ -169,18 +189,16 @@ class BaseContext:
         operation has already been performed (and should thus be skipped),
         this will return ``True``. If the operation needs to be executed,
         the returned value will be ``False``.
+
+        Note that the criteria are marked as processed immediately, before
+        the operation actually runs. For a two-phase check/mark, use
+        ``check_incremental`` and ``mark_incremental``.
         """
         if not self.incremental:
             return False
-
-        key = self.make_key(*criteria, prefix="inc")
-        if key is None:
-            return False
-
-        if self.check_tag(key):
+        if self.check_incremental(*criteria):
             return True
-
-        self.set_tag(key, "inc")
+        self.mark_incremental(*criteria)
         return False
 
     def store_file(
