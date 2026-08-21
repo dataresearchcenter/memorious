@@ -72,17 +72,29 @@ Common handler names:
 
 ```bash
 # Run synchronously (waits for completion)
-memorious run my_crawler.yml
+memorious run -c my_crawler.yml
 
-# Queue for background workers
-memorious start my_crawler.yml
+# Run with higher concurrency for I/O-bound crawlers
+memorious run -c my_crawler.yml --concurrency 8
 
-# Run with custom Python modules
-memorious run my_crawler.yml --src ./src
-
-# Incremental mode (skip already-processed items)
-memorious run my_crawler.yml --incremental
+# Delete existing data first, then re-run from scratch
+memorious run -c my_crawler.yml --flush
 ```
+
+`memorious run` embeds its own worker. To process jobs with separate,
+long-lived workers instead, start them with procrastinate's CLI:
+
+```bash
+procrastinate worker -q memorious
+```
+
+Custom Python operations are referenced from the pipeline with `module:function`
+syntax (e.g. `mypackage.ops:my_func` or `./src/ops.py:my_func`) — there is no
+command-line flag for them.
+
+Incremental mode (skipping already-processed items) is on by default and is
+controlled by the `MEMORIOUS_INCREMENTAL` setting, not a CLI flag. See
+[Incremental Crawling](incremental.md).
 
 ## Common Patterns
 

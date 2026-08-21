@@ -76,3 +76,7 @@ class Settings(BaseSettings):
 
     tags_uri: str | None = Field(default=None)
     """Tags storage for incremental crawling and HTTP caching (default in archive)"""
+
+
+MEMORIOUS_QUEUE = "memorious"
+MEMORIOUS_TASK = "memorious.tasks.execute_stage"

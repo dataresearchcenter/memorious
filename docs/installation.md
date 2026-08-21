@@ -43,7 +43,7 @@ memorious --version
 Crawlers are defined in YAML files. Run a crawler with:
 
 ```bash
-memorious run my_crawler.yml
+memorious run -c my_crawler.yml
 ```
 
 Custom operations can be referenced directly by file path - no extra installation required:
@@ -92,6 +92,18 @@ export MEMORIOUS_CACHE_URI=redis://localhost:6379/0
 # PostgreSQL for job queue and tags
 export MEMORIOUS_TAGS_URI=postgresql://user:pass@localhost/memorious
 export PROCRASTINATE_DB_URI=postgresql://user:pass@localhost/memorious
+
+# Procrastinate app, needed by standalone workers
+export PROCRASTINATE_APP=memorious.tasks.app
 ```
+
+Start one or more long-lived workers with procrastinate's CLI, listening on the
+`memorious` queue:
+
+```bash
+procrastinate worker -q memorious -c 4
+```
+
+See the [CLI Reference](reference/cli.md#running-a-standalone-worker) for details.
 
 See the [Settings Reference](reference/settings.md) for all configuration options.

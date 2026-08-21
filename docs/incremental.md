@@ -110,14 +110,14 @@ export MEMORIOUS_INCREMENTAL=false
 export MEMORIOUS_INCREMENTAL=true
 ```
 
-### CLI Flag
+Incremental mode is controlled by this setting only — there is no CLI flag:
 
 ```bash
 # Run with incremental mode (default)
-memorious run my_crawler.yml
+memorious run -c my_crawler.yml
 
 # Run without incremental mode (reprocess everything)
-memorious run my_crawler.yml --no-incremental
+MEMORIOUS_INCREMENTAL=false memorious run -c my_crawler.yml
 ```
 
 ## Cache Key Generation
@@ -311,7 +311,7 @@ Enable debug logging to see incremental skip decisions:
 
 ```bash
 export MEMORIOUS_DEBUG=true
-memorious run my_crawler.yml
+memorious run -c my_crawler.yml
 ```
 
 You'll see log messages like:
@@ -323,7 +323,7 @@ Skipping emit (incremental) cache_key=my_crawler/emit/abc123...
 To force a full reprocessing, run without incremental mode:
 
 ```bash
-memorious run my_crawler.yml --no-incremental
+MEMORIOUS_INCREMENTAL=false memorious run -c my_crawler.yml
 ```
 
 ## Tag Scopes Explained
@@ -376,7 +376,7 @@ To completely reset incremental state:
 
 ```bash
 # Via CLI
-memorious run my_crawler.yml --flush
+memorious run -c my_crawler.yml --flush
 
 # Programmatically
 crawler.flush_tags()

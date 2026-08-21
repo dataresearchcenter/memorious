@@ -14,7 +14,7 @@ from openaleph_procrastinate.model import DatasetJob
 from openaleph_procrastinate.tasks import task
 
 from memorious.logic.crawler import get_crawler
-from memorious.settings import Settings
+from memorious.settings import MEMORIOUS_QUEUE, MEMORIOUS_TASK, Settings
 
 log = get_logger(__name__)
 
@@ -103,8 +103,8 @@ def defer_stage(
     This is called by Context.emit() to queue subsequent stages.
     """
     job = DatasetJob(
-        queue="memorious",
-        task="memorious.tasks.execute_stage",
+        queue=MEMORIOUS_QUEUE,
+        task=MEMORIOUS_TASK,
         dataset=dataset,
         payload={
             "stage": stage,

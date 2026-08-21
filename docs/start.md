@@ -53,7 +53,7 @@ This crawler:
 ## Run It
 
 ```bash
-memorious run my_crawler.yml
+memorious run -c my_crawler.yml
 ```
 
 ## What's Next?

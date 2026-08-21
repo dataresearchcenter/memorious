@@ -115,30 +115,6 @@ def run_crawler(
     crawler.log.info(f"[{crawler.name}] Crawler completed.")
 
 
-@cli.command("worker")
-def worker(
-    concurrency: Annotated[
-        int,
-        typer.Option(
-            "--concurrency",
-            "-c",
-            help="Number of concurrent jobs (use >1 for I/O-bound crawlers)",
-        ),
-    ] = 1,
-):
-    """Start the procrastinate worker to process crawler jobs."""
-    from procrastinate.jobs import DeleteJobCondition
-
-    from memorious.tasks import app as procrastinate_app
-
-    console.print(f"Starting memorious worker with concurrency={concurrency}")
-    procrastinate_app.run_worker(
-        wait=True,
-        concurrency=concurrency,
-        delete_jobs=DeleteJobCondition.SUCCESSFUL,
-    )
-
-
 @cli.command("cancel")
 def cancel(config: OPT_CONFIG):
     """Cancel pending jobs for a crawler."""

@@ -121,6 +121,7 @@ Memorious uses [openaleph-procrastinate](https://github.com/openaleph/openaleph-
 | Environment Variable | Type | Default | Description |
 |---------------------|------|---------|-------------|
 | `PROCRASTINATE_DB_URI` | `str` | `memory:` | Database URI for job queue. Use `memory:` for testing, PostgreSQL for production |
+| `PROCRASTINATE_APP` | `str` | | Dotted path to the procrastinate app. Set to `memorious.tasks.app` when running a standalone `procrastinate worker -q memorious` |
 | `PROCRASTINATE_SYNC` | `bool` | `false` | Enable synchronous execution (useful for testing) |
 
 **Examples:**
@@ -198,6 +199,7 @@ export MEMORIOUS_TAGS_URI=postgresql://memorious:secret@db:5432/memorious
 
 # Job queue
 export PROCRASTINATE_DB_URI=postgresql://memorious:secret@db:5432/memorious
+export PROCRASTINATE_APP=memorious.tasks.app
 
 # Archive storage
 export LAKEHOUSE_URI=s3://my-bucket/memorious
@@ -231,10 +233,11 @@ services:
 
   worker:
     image: ghcr.io/dataresearchcenter/memorious:latest
-    command: memorious worker --concurrency 4
+    command: procrastinate worker -q memorious -c 4
     environment:
       MEMORIOUS_CACHE_URI: redis://redis:6379/0
       MEMORIOUS_TAGS_URI: postgresql://user:pass@postgres/memorious
+      PROCRASTINATE_APP: memorious.tasks.app
       PROCRASTINATE_DB_URI: postgresql://user:pass@postgres/memorious
       LAKEHOUSE_URI: /data/archive
     volumes:
@@ -277,10 +280,12 @@ The `memorious run` command accepts options that affect runtime behavior:
 
 | Option | Default | Description |
 |--------|---------|-------------|
+| `--config` / `-c` | *required* | URI or path to the crawler YAML config file |
 | `--continue-on-error` | `false` | Don't stop on errors |
 | `--flush` | `false` | Delete all existing data before execution |
 | `--concurrency` | `1` | Number of concurrent jobs |
-| `--wait` | `false` | Keep worker running after jobs complete |
+| `--wait` / `-w` | `false` | Keep worker running after jobs complete |
+| `--idle-timeout` / `-t` | `30` | Auto-stop after N seconds of inactivity (`0` disables) |
 | `--clear-runs` | `true` | Cancel pending jobs from previous runs before starting |
 
 Use `--no-clear-runs` to resume an interrupted crawl without losing queued jobs.

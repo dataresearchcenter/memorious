@@ -53,7 +53,7 @@ pipeline:
 
 ```bash
 pip install memorious
-memorious run my_crawler.yml
+memorious run -c my_crawler.yml
 ```
 
 ## Documentation

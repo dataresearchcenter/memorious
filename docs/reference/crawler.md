@@ -48,10 +48,10 @@ By default, `memorious run` cancels any pending jobs from previous runs before s
 
 ```bash
 # Default: cancel previous jobs before starting
-memorious run crawler.yml
+memorious run -c crawler.yml
 
 # Keep previous jobs in queue (resume interrupted crawl)
-memorious run crawler.yml --no-clear-runs
+memorious run -c crawler.yml --no-clear-runs
 ```
 
 ### Cancel vs Stop
