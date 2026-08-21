@@ -7,6 +7,7 @@ from unittest.mock import ANY, MagicMock, patch
 
 import httpx
 from ftm_lakehouse import get_entities
+from ftmq.query import C, P, Query
 
 from memorious.operations.fetch import fetch, session
 from memorious.operations.initializers import dates, enumerate, seed, sequence
@@ -437,13 +438,9 @@ def test_lakehouse_default(context, mocker, httpbin_url):
     assert context.emit.call_count == 1
 
     # Verify entity was created with origin=crawl
-    entities_repo = get_entities(context.crawler.name)
-    entities_repo.flush()
-    entities = [
-        e
-        for e in entities_repo.query(origin="crawl")
-        if content_hash in e.get("contentHash")
-    ]
+    repo = get_entities(context.crawler.name)
+    repo.flush()
+    entities = list(repo.query(Query(C(origin="crawl"), P(contentHash=content_hash))))
     assert len(entities) == 1
     assert entities[0].schema.name == "Document"
 
@@ -470,9 +467,8 @@ def test_lakehouse_make_entities_disabled(context, mocker, httpbin_url):
 
     # Verify no entity was created for this file
     repo = get_entities(context.crawler.name)
-    entities = [
-        e for e in repo.query(origin="crawl") if content_hash in e.get("contentHash")
-    ]
+    repo.flush()
+    entities = list(repo.query(Query(C(origin="crawl"), P(contentHash=content_hash))))
     assert len(entities) == 0
 
     # Clean up param
