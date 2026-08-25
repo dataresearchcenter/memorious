@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, ContextManager
 from urllib.parse import unquote, urlparse
 
 import httpx
-from anystore.logic.constants import CHUNK_SIZE, CHUNK_SIZE_LARGE
+from anystore.logic.constants import CHUNK_SIZE
 from banal import is_mapping
 from lxml import etree, html
 from normality import guess_file_encoding, stringify
@@ -336,7 +336,7 @@ class ContextHttpResponse:
         # If resuming, hash existing content first
         if start_byte > 0 and temp_path.exists():
             with open(temp_path, "rb") as f:
-                while chunk := f.read(CHUNK_SIZE_LARGE):
+                while chunk := f.read(CHUNK_SIZE):
                     content_hash.update(chunk)
 
         try:
