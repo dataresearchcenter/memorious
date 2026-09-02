@@ -206,10 +206,11 @@ class BaseContext:
         file_path: str | Path,
         origin: str | None = DEFAULT_ORIGIN,
         checksum: str | None = None,
+        **kwargs,
     ) -> str:
         """Put a file into permanent storage so it can be visible to other stages."""
         file_info = self.archive.store(
-            file_path, checksum=checksum, origin=origin or DEFAULT_ORIGIN
+            file_path, checksum=checksum, origin=origin or DEFAULT_ORIGIN, **kwargs
         )
         return file_info.checksum
 

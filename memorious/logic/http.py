@@ -27,6 +27,11 @@ from memorious.helpers.ua import UserAgent
 from memorious.logic.mime import NON_HTML
 from memorious.model.session import SessionModel
 from memorious.util import make_url_key
+from memorious.logic.warc import build_warc
+
+from warcio.archiveiterator import ArchiveIterator
+
+import contextlib
 
 if TYPE_CHECKING:
     from memorious.logic.context import BaseContext
@@ -331,27 +336,29 @@ class ContextHttpResponse:
             start_byte = self.partial_path.stat().st_size
             temp_path = self.partial_path
 
-        content_hash = sha256()
+        # content_hash = sha256()
 
         # If resuming, hash existing content first
-        if start_byte > 0 and temp_path.exists():
-            with open(temp_path, "rb") as f:
-                while chunk := f.read(CHUNK_SIZE):
-                    content_hash.update(chunk)
+        # if start_byte > 0 and temp_path.exists():
+        #     with open(temp_path, "rb") as f:
+        #         while chunk := f.read(CHUNK_SIZE):
+        #             content_hash.update(chunk)
 
         try:
             # Stream to temp file (append if resuming, write if fresh)
             mode = "ab" if start_byte > 0 else "wb"
             with open(temp_path, mode) as f:
-                for chunk in self.response.iter_bytes(chunk_size=CHUNK_SIZE):
-                    content_hash.update(chunk)
+                for chunk in self.response.iter_raw(chunk_size=CHUNK_SIZE):
                     f.write(chunk)
 
             # Complete - store in archive
-            self._content_hash = content_hash.hexdigest()
-            self.context.store_data(temp_path.open("rb"), checksum=self._content_hash)
+            # self._content_hash = content_hash.hexdigest()
+            # self.context.store_data(temp_path.open("rb"), checksum=self._content_hash)
+            warc_path = build_warc(self.request, self.response, temp_path)
+            self._content_hash = self.context.store_file(warc_path)
 
-            # Cleanup temp file on success
+            # Cleanup temp files on success
+            warc_path.unlink(missing_ok=True)
             temp_path.unlink(missing_ok=True)
 
         except httpx.HTTPError:
@@ -493,11 +500,20 @@ class ContextHttpResponse:
 
     @cached_property
     def raw(self) -> bytes | None:
-        """Get raw response content from archive."""
+        """Get decoded response body from the stored WARC.
+
+        The payload must be read while the archive file handle is open:
+        ArchiveIterator records are only valid for the current record.
+        content_stream() honors Content-Encoding, so this returns the
+        decoded body (what text/html/json downstream expect).
+        """
         if self.content_hash is None:
             return None
         with self.context.open(self.content_hash) as fh:
-            return fh.read()
+            for record in ArchiveIterator(fh):
+                if record.rec_type == "response":
+                    return record.content_stream().read()
+        return None
 
     @cached_property
     def text(self) -> str | None:
@@ -550,6 +566,18 @@ class ContextHttpResponse:
         if self.content_hash is None:
             raise ValueError("No content available")
         return self.context.local_path(self.content_hash)
+    
+    @contextlib.contextmanager
+    def local_path_response(self) -> ContextManager[Path]:
+        """Provide response (without WARC header) as a local file path (for operations that need file paths)."""
+        if self.content_hash is None:
+            raise ValueError("No content available")
+        tmp = Path(self.context.work_path) / f"{self.content_hash}_response"
+        tmp.write_bytes(self.raw)
+        try:
+            yield tmp
+        finally:
+            tmp.unlink(missing_ok=True)
 
     def __enter__(self):
         return self

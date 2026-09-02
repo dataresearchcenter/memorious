@@ -162,7 +162,7 @@ def _compute_file_path(
         dir_part = os.path.dirname(path)
         name_part = os.path.basename(path)
         if not name_part:
-            raise ValueError(f"Could not extract file name from URL path: {url}")
+            name_part = data.get('title') or 'index'
 
         # Optionally include domain
         if include_domain:
@@ -357,14 +357,16 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         # Store file in lakehouse archive with metadata. If the archive is the
         # same as the memorious intermediary archive (which is the default), the
         # file already exists and only the metadata is stored.
-        file = context.archive.store(
-            context.archive.to_uri(content_hash),
-            checksum=content_hash,
-            name=file_name,
-            key=file_key,
-            mimetype=mimetype,
-            **data,
-        )
+        with result.local_path_response() as lp:
+            file = context.archive.store(
+                lp,
+                name=file_name,
+                key=file_key,
+                mimetype=mimetype,
+                **data,
+            )
+            if file_key == "legal/de/datenschutzerklaerung-openaleph":
+                import ipdb; ipdb.set_trace()
 
         # Generate entities
         make_entities = context.params.get("make_entities", True)
