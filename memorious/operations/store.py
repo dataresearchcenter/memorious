@@ -365,8 +365,8 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
                 mimetype=mimetype,
                 **data,
             )
-            if file_key == "legal/de/datenschutzerklaerung-openaleph":
-                import ipdb; ipdb.set_trace()
+            # if file_key == "legal/de/datenschutzerklaerung-openaleph":
+            #     import ipdb; ipdb.set_trace()
 
         # Generate entities
         make_entities = context.params.get("make_entities", True)

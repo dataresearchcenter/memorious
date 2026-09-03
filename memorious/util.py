@@ -1,5 +1,5 @@
 import os
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urlsplit, urlunsplit
 from uuid import uuid4
 
 from anystore.util import join_relpaths
@@ -35,6 +35,10 @@ def make_url_key(
     """
     url = unquote(url)
     parts = urlsplit(url)
+    # Hard defragging, as per rfc7230, fragments are client-side only:
+    # "The target URI excludes the reference's fragment component, if any,since 
+    # fragment identifiers are reserved for client-side processing."
+    url = urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, ""))
     method = method or "GET"
     key_parts = [method.upper(), parts.netloc, parts.path.strip("/")]
     if parts.query:
