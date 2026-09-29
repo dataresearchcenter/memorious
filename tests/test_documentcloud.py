@@ -1,10 +1,18 @@
-import pytest  # noqa
+import json
 
+import httpx
+import pytest
+
+from memorious.exc import ParseError
 from memorious.operations.documentcloud import documentcloud_query
 
 
 class TestDocumentCloud(object):
-    # @pytest.mark.skip(reason="documentcloud returning errors under load")
+    @pytest.mark.xfail(
+        reason="flaky: documentcloud.org is not reliably reachable from all CIs",
+        raises=(json.JSONDecodeError, httpx.HTTPError, ParseError),
+        strict=False,
+    )
     def test_query(self, context, mocker):
         data = {}
         context.params["query"] = "money"
