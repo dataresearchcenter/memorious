@@ -183,7 +183,7 @@ def test_parse(context, mocker, httpbin_url):
         c for c in context.emit.call_args_list if c.kwargs.get("rule") == "fetch"
     ]
     emitted_data = fetch_calls[-1].kwargs["data"]
-    assert emitted_data["url"] == "https://iana.org/domains/example"
+    assert emitted_data["url"] == "https://iana.org/help/example-domains"
     assert data["title"] == "Example Domain"
     assert data["description"].startswith("This domain is for")
     assert context.emit.call_count == 3
