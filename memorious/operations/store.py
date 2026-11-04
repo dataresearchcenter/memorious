@@ -14,8 +14,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlparse
 
+from anystore.store.resource import UriResource
 from anystore.util import join_relpaths, make_checksum
+from banal import hash_data
 from ftm_lakehouse.core.conventions import tag
+from ftm_lakehouse.helpers.file import make_file_entities
 from ftmq.util import make_entity
 from normality import safe_filename
 from rigour.mime import normalize_mimetype
@@ -25,6 +28,9 @@ from memorious.operations import register
 
 if TYPE_CHECKING:
     from memorious.logic.context import Context
+
+META_PREFIX = "memorious"
+"""File metadata path prefix relative to the blob's archive directory"""
 
 
 def _get_directory_path(context: Context) -> str:
@@ -303,7 +309,8 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
 
     Args:
         context: The crawler context.
-        data: Must contain content_hash from a fetched response.
+        data: Must contain content_hash from a fetched response. An optional
+            `id` is used as the id of the file entity.
 
     Params:
         compute_path (optional): Configure how file keys are computed.
@@ -354,30 +361,53 @@ def lakehouse(context: Context, data: dict[str, Any]) -> None:
         # apply ftm properties
         data["sourceUrl"] = data.get("sourceUrl", data.get("url"))
 
-        # Store file in lakehouse archive with metadata. If the archive is the
-        # same as the memorious intermediary archive (which is the default), the
-        # file already exists and only the metadata is stored.
-        file = context.archive.store(
-            context.archive.to_uri(content_hash),
-            checksum=content_hash,
-            name=file_name,
-            key=file_key,
-            mimetype=mimetype,
-            **data,
-        )
+        # Store file in lakehouse archive. If the archive is the same as the
+        # memorious intermediary archive (which is the default), the blob
+        # already exists and is not stored again.
+        uri = context.archive.to_uri(content_hash)
+        checksum = context.archive.store(uri, checksum=content_hash)
+
+        # Store metadata as json next to the blob, one file per source (keyed
+        # by the hashed incremental key), as the same blob can have many sources
+        meta_key = data.get("_emit_cache_key") or data.get("request_id") or file_key
+        meta_path = f"{META_PREFIX}/{hash_data(meta_key)}.json"
+        meta = {**data, "name": file_name, "key": file_key, "mimetype": mimetype}
+        context.archive.put_data(checksum, meta_path, json.dumps(meta).encode())
 
         # Generate entities
         make_entities = context.params.get("make_entities", True)
         if make_entities:
-            context.entities.add_many(file.make_entities(), origin=tag.CRAWL_ORIGIN)
+            info = UriResource(uri).info()
+            info = info.model_copy(
+                update={"name": file_name, "key": file_key, "mimetype": mimetype}
+            )
+            file_entities = list(
+                make_file_entities(info, checksum, context.crawler.name)
+            )
+            # apply ftm properties from data to the file (last) entity
+            file_entity = file_entities[-1]
+            # an explicit `id` in data sets the file entity id (may be non-str).
+            # Rebuild instead of setting `.id`, as statements bind the id on add
+            if data.get("id"):
+                file_entity = make_entity(
+                    {**file_entity.to_dict(), "id": str(data["id"])},
+                    default_dataset=context.crawler.name,
+                )
+                file_entities[-1] = file_entity
+            for prop in file_entity.schema.properties:
+                if prop in data:
+                    file_entity.add(prop, data[prop])
+            context.entities.add_many(file_entities, origin=tag.CRAWL_ORIGIN)
             # check for entities in payload
             entities = data.get("entities", [])
-            entities = [make_entity(e, context.crawler.name) for e in entities]
+            entities = [
+                make_entity(e, default_dataset=context.crawler.name) for e in entities
+            ]
             if entities:
                 context.entities.add_many(entities, origin=tag.CRAWL_ORIGIN)
 
         context.log.info(
-            "Store [lakehouse]", file=file_name, key=file_key, checksum=file.checksum
+            "Store [lakehouse]", file=file_name, key=file_key, checksum=checksum
         )
 
         # Mark incremental completion

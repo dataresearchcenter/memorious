@@ -1,11 +1,14 @@
+import base64
 import json
 import os
 import shutil
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import ANY, MagicMock, patch
+from uuid import uuid4
 
 import httpx
+from banal import hash_data
 from ftm_lakehouse import get_entities
 from ftmq.query import C, P, Query
 
@@ -158,17 +161,24 @@ def test_session(context, mocker, httpbin_url):
 
 
 def test_parse(context, mocker, httpbin_url):
-    url = "http://example.org/"
+    # serve a fixed page via the local httpbin instead of relying on a live site
+    html = (
+        "<html><head><title>Example Domain</title></head><body>"
+        "<h1>Example Domain</h1>"
+        "<p>This domain is for use in illustrative examples.</p>"
+        '<a href="/more">More information...</a>'
+        "</body></html>"
+    )
+    url = f"{httpbin_url}/base64/{base64.urlsafe_b64encode(html.encode()).decode()}"
     result = context.http.get(url)
     data = result.serialize()
 
     mocker.patch.object(context, "emit")
 
-    rules = {"pattern": f"{httpbin_url}/*"}
-    context.params["store"] = rules
+    # store rules that don't match the page
+    context.params["store"] = {"domain": "example.org"}
     context.params["meta"] = {"title": ".//h1", "description": ".//p"}
     parse(context, data)
-    assert context.emit.call_count == 1
     context.emit.assert_called_once_with(rule="fetch", data=ANY)
 
     # cleanup tags
@@ -183,7 +193,8 @@ def test_parse(context, mocker, httpbin_url):
         c for c in context.emit.call_args_list if c.kwargs.get("rule") == "fetch"
     ]
     emitted_data = fetch_calls[-1].kwargs["data"]
-    assert emitted_data["url"] == "https://iana.org/help/example-domains"
+    # relative link resolved against the page url
+    assert emitted_data["url"] == f"{httpbin_url}/more"
     assert data["title"] == "Example Domain"
     assert data["description"].startswith("This domain is for")
     assert context.emit.call_count == 3
@@ -431,10 +442,15 @@ def test_lakehouse_default(context, mocker, httpbin_url):
     # Verify file is in the default archive
     # With url_path default, name comes from URL path (user-agent, no safe_filename)
     content_hash = data.get("content_hash")
-    files = list(context.archive.get_all_files(content_hash))
-    assert len(files) >= 1
-    file_names = [f.name for f in files]
-    assert "user-agent" in file_names
+    assert context.archive.exists(content_hash)
+    # no emit happened, so metadata is keyed by the request_id
+    meta_path = f"memorious/{hash_data(data['request_id'])}.json"
+    meta = json.loads(context.archive.get_data(content_hash, meta_path))
+    assert meta["name"] == "user-agent"
+    assert meta["key"] == "user-agent"
+    assert meta["url"] == url
+    assert meta["sourceUrl"] == url
+    assert meta["content_hash"] == content_hash
     assert context.emit.call_count == 1
 
     # Verify entity was created with origin=crawl
@@ -443,6 +459,9 @@ def test_lakehouse_default(context, mocker, httpbin_url):
     entities = list(repo.query(Query(C(origin="crawl"), P(contentHash=content_hash))))
     assert len(entities) == 1
     assert entities[0].schema.name == "Document"
+    assert entities[0].first("fileName") == "user-agent"
+    # test dataset persists, httpbin port (sourceUrl) changes per run
+    assert url in entities[0].get("sourceUrl")
 
 
 def test_lakehouse_make_entities_disabled(context, mocker, httpbin_url):
@@ -461,8 +480,9 @@ def test_lakehouse_make_entities_disabled(context, mocker, httpbin_url):
 
     # Verify file is in the archive
     content_hash = data.get("content_hash")
-    files = list(context.archive.get_all_files(content_hash))
-    assert len(files) >= 1
+    assert context.archive.exists(content_hash)
+    meta_path = f"memorious/{hash_data(data['request_id'])}.json"
+    assert context.archive.get_data(content_hash, meta_path)
     assert context.emit.call_count == 1
 
     # Verify no entity was created for this file
@@ -473,6 +493,52 @@ def test_lakehouse_make_entities_disabled(context, mocker, httpbin_url):
 
     # Clean up param
     del context.params["make_entities"]
+
+
+def test_lakehouse_metadata_per_source(context, mocker, httpbin_url):
+    """Same blob from different sources keeps a metadata file per source."""
+    # unique content per run, the test dataset persists across tests
+    data = context.http.get(f"{httpbin_url}/uuid").serialize()
+    content_hash = data["content_hash"]
+
+    mocker.patch.object(context, "emit")
+    for key in ("source-a", "source-b"):
+        lakehouse(context, {**data, "_emit_cache_key": key, "title": key})
+
+    for key in ("source-a", "source-b"):
+        meta_path = f"memorious/{hash_data(key)}.json"
+        meta = json.loads(context.archive.get_data(content_hash, meta_path))
+        assert meta["title"] == key
+
+
+def test_lakehouse_explicit_id(context, mocker, httpbin_url):
+    """An `id` in data is the file entity id, payload entities can refer to it."""
+    # unique content and id per run, the test dataset persists across tests
+    data = context.http.get(f"{httpbin_url}/uuid").serialize()
+    content_hash = data["content_hash"]
+    data["id"] = uuid4().int  # non-str, like a source db id
+    file_id = str(data["id"])
+    mention_id = f"mention-{file_id}"
+    data["entities"] = [
+        {
+            "id": mention_id,
+            "schema": "Mention",
+            "properties": {"name": ["Herman Melville"], "document": [file_id]},
+        }
+    ]
+
+    mocker.patch.object(context, "emit")
+    lakehouse(context, data)
+
+    repo = get_entities(context.crawler.name)
+    file_entity = repo.get(file_id, flush_first=True)
+    assert file_entity is not None
+    assert file_entity.schema.name == "Document"
+    assert file_entity.first("contentHash") == content_hash
+    assert file_entity.first("fileName") == "uuid"
+    mention = repo.get(mention_id)
+    assert mention is not None
+    assert mention.first("document") == file_id
 
 
 # Tests for _compute_file_path helper function
