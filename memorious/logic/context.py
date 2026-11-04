@@ -35,7 +35,6 @@ if TYPE_CHECKING:
     from memorious.logic.http import ContextHttp
     from memorious.model.stage import CrawlerStage
 
-DEFAULT_ORIGIN = "memorious"
 CACHE_ORIGIN = "memorious-cache"
 
 
@@ -201,17 +200,9 @@ class BaseContext:
         self.mark_incremental(*criteria)
         return False
 
-    def store_file(
-        self,
-        file_path: str | Path,
-        origin: str | None = DEFAULT_ORIGIN,
-        checksum: str | None = None,
-    ) -> str:
+    def store_file(self, file_path: str | Path, checksum: str | None = None) -> str:
         """Put a file into permanent storage so it can be visible to other stages."""
-        file_info = self.archive.store(
-            file_path, checksum=checksum, origin=origin or DEFAULT_ORIGIN
-        )
-        return file_info.checksum
+        return self.archive.store(file_path, checksum=checksum)
 
     def store_data(self, data: Any, checksum: str | None = None) -> str:
         if isinstance(data, (BinaryIO, BytesIO, BufferedReader)):
